@@ -1,4 +1,4 @@
-# Project Planning
+# Project Specification
 
 This file describes the overall design and plan for the Pokemon Go Battle Simulation components.
 
