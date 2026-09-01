@@ -459,11 +459,79 @@ Validation should confirm:
 - battle result shape and rating consistency
 - stable TUI behavior as a display-only surface
 
+## 13. Turn-Resolution Semantics
+
+The engine resolves each turn deterministically using the following model:
+
+### 13.1 Pre-turn state check
+
+Before action collection, check for in-progress fast moves from the previous turn:
+- If both participants have fast moves in-progress, only the turn clock advances (decrement durations)
+- No further actions are processed; the turn is a clock-only progression
+
+### 13.2 Action and decision collection
+
+For each participant, collect two inputs:
+1. **Action request**: move choice (fast move, charged move, swap, or wait)
+2. **Shield decision request** (only if opponent is using a charged move): binary shield/no-shield choice based on observation
+
+### 13.3 Action execution order
+
+Execute actions in this priority order:
+1. **Swaps** (all swaps execute first, no damage yet)
+2. **Charged moves** (ordered by CMP: higher attack stat goes first; ties broken left-to-right by participant)
+3. **Fast moves** (all queued for damage application at end-of-turn)
+
+### 13.4 Charged move resolution with CMP cascade
+
+For each charged move in CMP order:
+- If opponent has an in-progress fast move, complete it immediately (damage still applies if attacker survives)
+- Calculate base damage
+- Apply shield if defender chose to shield (reduces damage to 1, consumes one shield)
+- Apply damage to defender
+- Apply stat changes and buffs/debuffs
+- **Cascade check**: if defender faints:
+  - Cancel defender's in-progress fast move (damage never applies)
+  - Cancel defender's queued charged move (does not fire)
+  - Trigger forced swap logic (see section 13.6)
+
+### 13.5 Fast move resolution
+
+For fast moves in queue:
+- Only queue damage if source is NOT fainted (killed by opponent's charged move)
+- Start or continue fast move duration (1+ turns)
+- Queued damage applies at end-of-turn
+
+### 13.6 End-of-turn resolution
+
+1. Apply all queued fast move damage
+2. Apply all energy gains (cannot be used until next turn)
+3. Reset fast move cooldowns for completed moves
+4. Detect any faints from queued damage
+5. Process forced swaps (auto-select next available bench Pokémon)
+6. Record timeline events for all actions and damage
+7. Finalize snapshot for next turn
+
+### 13.7 Key determinism rules
+
+- **Simultaneous KOs are possible**: both participants can faint on the same turn if both survive charged moves and their fast moves both apply damage
+- **Energy cannot be spent in the turn it is gained**: end-of-turn energy gain becomes available starting next turn
+- **CMP controls charged move ordering**: higher attack stat charged move resolves first; if it kills, opponent's charged move does not fire
+- **Forced completion of in-progress fast moves**: when opponent uses charged move, any in-progress fast move completes immediately (but only applies damage if attacker survives the charged move)
+- **Left-to-right tiebreaker**: for actions of the same type with equal priority, participant-0 (left side) executes before participant-1 (right side)
+
+### 13.8 Timeline events
+
+The following event types are recorded during turn resolution:
+- `tap interaction`: fast move starts or completes
+- `charged <type>`: charged move is used (includes damage and shield status)
+- `switchAvailable`: swap is available to the player (after charged move completes)
+- `faint`: Pokémon faints
+- `tap interaction wait`: fast move is still in-progress, waiting for completion
+
 ## 12. Open Design Questions
 
 The draft blueprint intentionally leaves the following as explicit decision points that must be clarified before implementation starts:
 
-- exact command and state schema for the immutable snapshot
-- exact shape of the observation and action contracts
-- exact event schema for the replay timeline
+- exact event schema for the replay timeline (beyond event types)
 - exact module boundaries for engine, TUI, and serialization layers
