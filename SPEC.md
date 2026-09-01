@@ -109,25 +109,71 @@ This is the core rule for the battle engine. Every turn is a transition from one
 
 ### 4.2 Action collection
 
-At the start of each turn, the engine asks each registered participant for an action. The action request must be driven by the participant’s visible information view rather than the full engine state.
-
-Actions may include:
+At the start of each turn, the engine collects **move action requests** from each registered participant, driven by the participant's visible information view:
 
 - fast move
 - charged move
 - swap
 - wait
-- any future battle-specific action type that can be normalized into the engine’s action model
+- any future battle-specific action type that can be normalized into the engine's action model
+
+During turn resolution, when a charged move is queued to hit a target, the engine requests a **shield decision** from the defending participant. This decision is made within the turn, does not consume a turn or action, and is specific to that incoming charged move. The defender makes the shield decision based on their observation state—they know a charged move is incoming but do not see the specific move identity or base damage.
 
 ### 4.3 Action resolution order
 
-The engine resolves actions according to the deterministic battle rules already established by the existing system, including:
+The engine resolves actions according to the deterministic battle rules already established by the existing system, with the following specifics:
 
-- priority and turn ordering
-- swap timing relative to incoming damage
-- charged attack start and completion timing
-- end-of-turn damage resolution and energy gain timing
-- forced-swap behavior when a Pokémon faints
+#### Turn progression and fast-move duration
+
+- Fast moves have a duration of one or more turns. An in-progress fast move from a prior turn may "lock" a participant, preventing other actions until the duration completes.
+- If both participants have fast moves in-progress on the same turn, only the turn clock advances (durations decrement); no other actions are processed.
+- When a participant uses a charged move, any opponent in-progress fast move completes immediately as part of that turn's resolution.
+
+#### Action execution priority
+
+Within a turn, actions execute in this order:
+
+1. **Swaps** (all swaps execute first, before any damage is applied)
+2. **Charged moves** (ordered by CMP: Charged Move Priority)
+3. **Fast moves** (damage queued for end-of-turn application)
+
+#### Charged Move Priority (CMP)
+
+When multiple participants use charged moves on the same turn:
+- The participant with the higher attack stat has their charged move resolve first
+- If attack stats are equal, left-to-right participant ordering breaks the tie
+- **Cascade consequence**: if a charged move resolves first and causes the target to faint, the target's queued charged move does not fire, and any in-progress fast move is cancelled
+
+#### Charged move resolution with shield decision
+
+When a charged move is being applied to a target:
+
+1. Request shield decision from the target (asynchronous, within the turn, does not advance turn counter)
+2. Calculate base damage
+3. If defender chose to shield, reduce damage to 1 and consume one shield
+4. Apply final damage to defender
+5. Apply stat changes and buffs/debuffs
+6. Check for faint and cascade
+
+#### End-of-turn resolution
+
+After all charged and fast move actions are queued:
+- Apply all queued fast move damage
+- Apply all energy gains (energy gained in turn N is available starting turn N+1, not usable in the same turn)
+- Reset fast-move cooldowns for completed moves
+- Detect faints from queued damage
+- Process forced swaps (auto-select next available bench Pokémon if active Pokémon faints)
+- Record timeline events
+
+#### Determinism guarantees
+
+These rules ensure the following:
+
+- **Simultaneous KOs are possible**: both participants can faint on the same turn if both survive each other's charged moves and their fast-move damage both apply
+- **No energy can be spent in the turn it is gained**: energy becomes available only in the following turn
+- **Swaps resolve before damage**: swap timing is deterministic and cannot be affected by incoming damage
+- **CMP controls charged move ordering**: higher attack stat moves resolve first; if fatal, the opponent's charged move is cancelled
+- **Forced-swap behavior is deterministic**: faints trigger automatic swap to the next available bench Pokémon at the end of the turn
 
 These rules remain the basis for correctness, even as the number of participants grows from 2 to N.
 
@@ -159,7 +205,19 @@ The player interface must not reveal the full internal engine state. Instead it 
 
 ### 5.2 Action contract
 
-The player interface should return a normalized action decision object, not a direct mutable reference into the engine. This keeps the player side decoupled from the engine internals and makes the interface suitable for:
+The player interface should return a normalized action decision object per turn, not a direct mutable reference into the engine state. This keeps the player side decoupled from the engine internals.
+
+Move action families:
+
+- fast move
+- charged move
+- swap
+- wait
+- future normalized battle actions
+
+**Shield decisions are separate**: When a charged move targets the defender, the engine requests a binary shield/no-shield decision during turn resolution. This decision is asynchronous, does not advance the turn counter, and is based on the defender's observation state. The defender does not see the incoming move identity or base damage.
+
+This contract makes the interface suitable for:
 
 - local human play
 - scripted agents

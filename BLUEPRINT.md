@@ -361,9 +361,22 @@ Expected action families:
 - wait
 - future normalized battle actions
 
-### 6.3 Robustness requirement
+**Note**: Shield decisions are **not** part of the action contract. Shield decisions are requested asynchronously during turn resolution when a charged move is about to hit the target. They do not advance the turn counter and are a separate decision interface.
+
+### 6.3 Shield decision contract
+
+When a charged move targets a defender during turn resolution, the engine requests a binary shield decision from the defender:
+
+- **No prior knowledge**: the defender does not see which move is incoming or its base damage
+- **Based on observation**: the defender decides using their visible state (own HP, energy, opponent's visible state, remaining shields)
+- **Asynchronous within turn**: the decision occurs during turn resolution and does not consume a turn or action slot
+- **Deterministic fallback**: if the defender cannot or does not respond, the default is no-shield
+
+### 6.4 Robustness requirement
 
 Invalid or unsupported actions should degrade predictably via fallback behavior rather than causing engine corruption.
+
+Shield decisions that timeout or are unavailable default to no-shield.
 
 ## 7. Turn Resolution Model
 
@@ -471,9 +484,11 @@ Before action collection, check for in-progress fast moves from the previous tur
 
 ### 13.2 Action and decision collection
 
-For each participant, collect two inputs:
+For each participant, collect one input at the start of the turn:
+
 1. **Action request**: move choice (fast move, charged move, swap, or wait)
-2. **Shield decision request** (only if opponent is using a charged move): binary shield/no-shield choice based on observation
+
+Shield decisions are **not** collected at turn start. Instead, they are requested **during turn resolution** when a charged move is about to be applied to a target. The shield decision is asynchronous and does not advance the turn counter—it occurs within the turn resolution phase.
 
 ### 13.3 Action execution order
 
@@ -482,10 +497,11 @@ Execute actions in this priority order:
 2. **Charged moves** (ordered by CMP: higher attack stat goes first; ties broken left-to-right by participant)
 3. **Fast moves** (all queued for damage application at end-of-turn)
 
-### 13.4 Charged move resolution with CMP cascade
+### 13.4 Charged move resolution with CMP cascade and shield decision
 
 For each charged move in CMP order:
 - If opponent has an in-progress fast move, complete it immediately (damage still applies if attacker survives)
+- **Request shield decision from defender** (asynchronous, within the turn, does not advance turn counter)
 - Calculate base damage
 - Apply shield if defender chose to shield (reduces damage to 1, consumes one shield)
 - Apply damage to defender
