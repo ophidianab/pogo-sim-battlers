@@ -239,6 +239,17 @@ Proposed JSON schema for the observation payload contract:
 
 This observation schema is the accepted contract and provides a restricted view suitable for human TUI rendering, scripted agents, and RL harnesses without exposing full engine state.
 
+**Observation versioning contract:**
+
+- `observationVersion`: semantic version (e.g., "1.0", "1.1", "2.0")
+  - Major version bump: breaking schema changes (field removed or type changed)
+  - Minor version bump: additive changes only (new optional fields)
+  - Agents and TUI should validate and reject incompatible versions
+
+- `schemaRevision`: monotonic integer for internal tracking and compatibility debugging
+
+All 1.x versions maintain backward compatibility (additive only). Breaking changes move to 2.0 or later.
+
 Proposed JSON schema for the battle result payload contract:
 
 ```json
