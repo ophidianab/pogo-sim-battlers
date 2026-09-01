@@ -250,6 +250,25 @@ This observation schema is the accepted contract and provides a restricted view 
 
 All 1.x versions maintain backward compatibility (additive only). Breaking changes move to 2.0 or later.
 
+**Visibility model for observations:**
+
+SELF SIDE (fully visible):
+- active Pokémon: species, currentHp (raw), maxHp (raw), hpPercentage, energy, statusEffects
+- bench: slot, species, currentHp (raw), maxHp (raw), hpPercentage
+- shields remaining count
+- all move identities (fast and charged)
+- move usage history
+- switchCooldown: turns remaining before voluntary swap is available (0 = can swap now)
+
+OPPONENT SIDE (limited visibility):
+- active Pokémon: species, hpPercentage only (no raw HP values)
+- bench count only (not individual Pokémon species)
+- shields remaining count
+- lastUsedMove: the move that resolved in the previous turn (fast or charged)
+- Hidden: opponent energy, opponent move identities (except lastUsedMove), opponent cooldowns (including switchCooldown), opponent in-progress fast move state, opponent status effects
+
+This visibility model mirrors in-game information: players see opponent species and shield count, learn opponent moves after they resolve, track their own cooldowns for informed decisions, and use move history to predict future actions.
+
 Proposed JSON schema for the battle result payload contract:
 
 ```json
