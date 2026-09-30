@@ -406,6 +406,13 @@ When a charged move targets a defender during turn resolution, the engine reques
 
 Invalid or unsupported actions should degrade predictably via fallback behavior rather than causing engine corruption.
 
+**Fallback strategy**:
+- Missing or invalid move action: default to `wait`
+- Invalid charged move with insufficient energy: degrade to `fast move` if legal, otherwise `wait`
+- Invalid swap with no available bench: default to `wait`
+- Missing or invalid shield decision: default to `no-shield`
+- Timeout handling: move actions and shield decisions should have explicit timeouts and log the timeout for debugging
+
 Shield decisions that timeout or are unavailable default to no-shield.
 
 ## 7. Turn Resolution Model
