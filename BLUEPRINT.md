@@ -250,6 +250,23 @@ This observation schema is the accepted contract and provides a restricted view 
 
 All 1.x versions maintain backward compatibility (additive only). Breaking changes move to 2.0 or later.
 
+**Player interface compatibility policy:**
+- `observationVersion`: semantic version (e.g., "1.0", "1.1", "2.0")
+  - Major bump: breaking changes
+  - Minor bump: additive changes only
+  - Patch bump: documentation or internal-only changes
+- `schemaRevision`: monotonic integer for compatibility logging and debugging
+- Agents and TUI must reject incompatible major versions
+- Minor versions remain compatible if the required fields remain present
+- Battle result metadata should include the observation schema version for replay and debugging
+
+**Shared player-facing contract:**
+- The observation payload is the shared contract for both human and automated players.
+- The TUI may enrich the same observation with presentation-only fields, but it must not mutate engine state.
+- The RL harness uses the same deterministic observation payload directly for action selection.
+- The action contract is shared across all player types: move actions at turn start, shield decisions only when a charged move is incoming.
+- The engine is responsible for validation and fallback behavior; players never receive internal engine state.
+
 **Visibility model for observations:**
 
 SELF SIDE (fully visible):
