@@ -44,6 +44,23 @@ pub enum Side {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct PokemonBuildInput {
+    pub species_id: String,
+    pub level: f32,
+    pub ivs: IndividualValues,
+    pub shadow: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IndividualValues {
+    pub attack: u8,
+    pub defense: u8,
+    pub hp: u8,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PokemonState {
     pub slot: usize,
     pub pokemon_id: String,
@@ -51,6 +68,7 @@ pub struct PokemonState {
     pub is_active: bool,
     pub current_hp: u32,
     pub max_hp: u32,
+    pub combat_stats: CombatStats,
     pub energy: u32,
     #[serde(default)]
     pub pending_energy_gain: u32,
@@ -59,6 +77,13 @@ pub struct PokemonState {
     pub cooldowns: Cooldowns,
     pub move_state: MoveState,
     pub flags: PokemonFlags,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CombatStats {
+    pub attack: f64,
+    pub defense: f64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -261,7 +286,7 @@ pub struct ParticipantResult {
 
 #[cfg(test)]
 mod tests {
-    use super::{ActionRequest, PlayerAction};
+    use super::{ActionRequest, IndividualValues, PlayerAction, PokemonBuildInput};
 
     #[test]
     fn action_request_uses_contract_field_names_and_keeps_shields_separate() {
@@ -280,5 +305,26 @@ mod tests {
         assert_eq!(json["actionType"], "chargedMove");
         assert_eq!(json["payload"]["moveId"], "move-1");
         assert!(json["payload"].get("shield").is_none());
+    }
+
+    #[test]
+    fn pokemon_build_input_serializes_level_ivs_and_shadow_status() {
+        let build = PokemonBuildInput {
+            species_id: "bulbasaur".to_owned(),
+            level: 20.5,
+            ivs: IndividualValues {
+                attack: 10,
+                defense: 11,
+                hp: 12,
+            },
+            shadow: false,
+        };
+
+        let json = serde_json::to_value(build).unwrap();
+
+        assert_eq!(json["speciesId"], "bulbasaur");
+        assert_eq!(json["level"], 20.5);
+        assert_eq!(json["ivs"]["attack"], 10);
+        assert_eq!(json["shadow"], false);
     }
 }

@@ -129,8 +129,8 @@ fn hp_percentage(current_hp: u32, max_hp: u32) -> f32 {
 #[cfg(test)]
 mod tests {
     use crate::model::{
-        BattleSnapshot, ControllerType, Cooldowns, MoveState, ParticipantState, PokemonFlags,
-        PokemonState, Side, TimelineEvent, TimelineEventKind, TurnRecord,
+        BattleSnapshot, CombatStats, ControllerType, Cooldowns, MoveState, ParticipantState,
+        PokemonFlags, PokemonState, Side, TimelineEvent, TimelineEventKind, TurnRecord,
     };
 
     use super::{ObservationError, build_observation};
@@ -143,6 +143,10 @@ mod tests {
             is_active: slot == 0,
             current_hp: hp,
             max_hp: 100,
+            combat_stats: CombatStats {
+                attack: 100.0,
+                defense: 100.0,
+            },
             energy: 40,
             pending_energy_gain: 0,
             status_effects: Vec::new(),

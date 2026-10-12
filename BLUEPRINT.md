@@ -93,6 +93,21 @@ Initial JSON-style shape for the snapshot root:
 
 The `participants` array will contain ordered participant entries with per-side roster and active-slot information, and the implementation will later map this contract into Rust structs.
 
+Battle initialization accepts a build input for each Pokémon. The caller supplies species, level, IVs, and shadow status; the initializer derives HP and effective combat stats once and stores the resulting values in the battle snapshot.
+
+```json
+{
+  "speciesId": "bulbasaur",
+  "level": 20,
+  "ivs": {
+    "attack": 10,
+    "defense": 10,
+    "hp": 10
+  },
+  "shadow": false
+}
+```
+
 Proposed JSON schema for the participant roster and team composition contract:
 
 ```json
@@ -140,6 +155,10 @@ Proposed JSON schema for the per-Pokémon runtime state contract:
   "isActive": true,
   "currentHp": 100,
   "maxHp": 100,
+  "combatStats": {
+    "attack": 123.45,
+    "defense": 145.67
+  },
   "energy": 0,
   "energyGain": 0,
   "statusEffects": [
@@ -170,6 +189,19 @@ Proposed JSON schema for the per-Pokémon runtime state contract:
 ```
 
 This runtime-state schema is the accepted contract for the next clarification item in the first gap category and will also be mapped into Rust structs during implementation.
+
+`combatStats.attack` and `combatStats.defense` are the initialized battle values derived from species base stats, IVs, and the selected level/CP multiplier. They are stored in the snapshot so damage and CMP use the same deterministic values on every turn. These values are before in-battle stat-stage changes and shadow modifiers; those are applied separately during resolution.
+
+The CPM values are stored in `engine/data/cpm.json` in their original order, beginning at level 1.0 with a 0.5-level step. Lookup uses the exact table entry at index `(level - 1.0) / 0.5`; valid levels must fall on a listed half-level. The engine uses direct lookup only and does not interpolate or apply the legacy neighboring-entry derivation.
+
+Initialization uses the CPM and the catalog's base stats with the supplied IVs:
+
+- `attack = CPM * (baseAttack + attackIV)`
+- `defense = CPM * (baseDefense + defenseIV)`
+- `maxHP = max(floor(CPM * (baseHP + hpIV)), 10)`, except Shedinja has 10 HP
+- `CP = max(floor((baseAttack + attackIV) * sqrt(baseDefense + defenseIV) * sqrt(baseHP + hpIV) * CPM^2 / 10), 10)`
+
+The stored attack and defense are unmodified initialization values. Shadow modifiers and in-battle stat stages are applied by the battle resolver, not during this calculation. Invalid IVs and levels without an exact CPM entry are rejected.
 
 Proposed JSON schema for the normalized action contract:
 

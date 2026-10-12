@@ -93,7 +93,10 @@ The simulator should continue to use a team-based structure for Pokémon GO-styl
 
 - each participant may have one active Pokémon and a bench or reserve set
 - a team may be 1-to-3 Pokémon in the current 1v1 compatibility path, and can be generalized to a larger roster for NvN
+- battle setup receives each Pokémon's species, level, IV spread, and shadow status, then derives its initialized HP and combat stats
 - each Pokémon records HP, energy, cooldowns, statuses, and current move availability
+- each Pokémon's battle state includes initialized effective attack and defense values derived from its species, IVs, and level/CP multiplier; these are stored before in-battle stat stages and shadow modifiers
+- the level-to-CPM values are a data asset indexed directly at half-level increments; unsupported levels are rejected rather than interpolated
 - battle-relevant data remains derived from the central immutable turn snapshot
 
 ## 4. Turn Resolution Model
@@ -250,7 +253,7 @@ The design baseline has been clarified and accepted for implementation as follow
 
 ### 7.1 Canonical runtime mapping
 
-- The canonical battle state remains the engine’s source of truth for HP, energy, shields, team state, and turn progression.
+- The canonical battle state remains the engine’s source of truth for HP, energy, initialized combat stats, shields, team state, and turn progression.
 - pvpoke runtime semantics are used as compatibility tests and validation targets, not as a direct internal schema mirror.
 - The engine must preserve timing semantics even when the internal state representation differs from the reference runtime.
 

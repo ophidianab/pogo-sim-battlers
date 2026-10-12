@@ -172,8 +172,8 @@ fn normalized_wait(
 mod tests {
     use crate::data::DataCatalog;
     use crate::model::{
-        BattleSnapshot, ControllerType, Cooldowns, MoveState, ParticipantState, PokemonFlags,
-        PokemonState, Side,
+        BattleSnapshot, CombatStats, ControllerType, Cooldowns, MoveState, ParticipantState,
+        PokemonFlags, PokemonState, Side,
     };
 
     use super::{FallbackReason, normalize_actions};
@@ -186,6 +186,10 @@ mod tests {
             is_active: slot == 0,
             current_hp: hp,
             max_hp: 100,
+            combat_stats: CombatStats {
+                attack: 100.0,
+                defense: 100.0,
+            },
             energy: 20,
             pending_energy_gain: 0,
             status_effects: Vec::new(),
