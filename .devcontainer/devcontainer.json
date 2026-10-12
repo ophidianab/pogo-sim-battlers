@@ -24,6 +24,5 @@
 	},
 	"remoteUser": "vscode",
 	"forwardPorts": [],
-	"workspaceFolder": "/workspace",
-	"shutdownAction": "stopCompose"
+	"workspaceFolder": "/workspace"
 }
