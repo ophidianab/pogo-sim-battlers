@@ -599,9 +599,54 @@ The following event types are recorded during turn resolution:
 - `faint`: Pokémon faints
 - `tap interaction wait`: fast move is still in-progress, waiting for completion
 
-## 12. Open Design Questions
+## 12. Accepted Design Resolutions
 
-The draft blueprint intentionally leaves the following as explicit decision points that must be clarified before implementation starts:
+The following design decisions have been accepted and are now part of the implementation baseline:
 
-- exact event schema for the replay timeline (beyond event types)
-- exact module boundaries for engine, TUI, and serialization layers
+### 12.1 Canonical runtime mappings
+
+- The engine’s canonical state remains the source of truth for HP, energy, cooldowns, shields, and roster state.
+- pvpoke runtime semantics are treated as compatibility targets for validation, not as a direct object mapping.
+- The battle runtime must preserve the exact timing semantics for energy gain, damage application, charged attacks, and swap ordering.
+
+### 12.2 Move timing and energy semantics
+
+- A charged move is queued at turn start and begins at the start of the next turn.
+- Damage resolves at the end of the turn.
+- Energy gained during a turn is not spendable until the following turn.
+- A charged move that would otherwise kill the target still resolves if it is valid and queued under the turn-order rules.
+
+### 12.3 Shield and mitigation rules
+
+- Shield decisions are requested during turn resolution and do not advance the turn counter.
+- Shielding reduces incoming damage according to the battle rules and consumes one shield.
+- The defender receives no prior knowledge of the incoming move identity or exact base damage before deciding.
+
+### 12.4 Swap and forced-swap semantics
+
+- Swaps resolve before damage.
+- Quick swaps consume a turn.
+- Forced swaps after a faint do not consume a turn.
+- Swap timing remains deterministic and does not depend on network variance.
+
+### 12.5 Module ownership and API boundaries
+
+- The battle engine owns the canonical immutable turn snapshot.
+- The player interface owns observation generation and action normalization.
+- The resolver owns action ordering and all battle-state transitions.
+- Replay/history and TUI layers are presentation or serialization concerns and must not mutate live engine state.
+
+### 12.6 Validation strategy
+
+- Rule-level unit tests cover move ordering, shield behavior, swap timing, and energy timing.
+- Snapshot-transition tests assert exact next-state output for a fixed input set.
+- Replay tests validate that generated timelines reconstruct the same battle state.
+- Observation contract tests validate version compatibility and explicit visibility rules.
+
+## 13. Remaining Open Design Questions
+
+The blueprint still leaves the following as explicit follow-up items for implementation detail work:
+
+- the final, exhaustive event schema for the replay timeline
+- the exact serialization boundary for battle logs and turn snapshots
+- any additional compatibility deltas to document when matching edge-case pvpoke behaviors

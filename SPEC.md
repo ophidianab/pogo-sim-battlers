@@ -244,9 +244,56 @@ A simple Text User Interface (TUI) must exist for manual testing of the simulato
 
 The TUI should be intentionally lightweight. It exists for debugging and interactive validation, not as a replacement for the engine or a general-purpose game client.
 
-## 7. Compatibility and Migration Strategy
+## 7. Accepted compatibility and ownership decisions
 
-### 7.1 Early milestone behavior
+The design baseline has been clarified and accepted for implementation as follows:
+
+### 7.1 Canonical runtime mapping
+
+- The canonical battle state remains the engine’s source of truth for HP, energy, shields, team state, and turn progression.
+- pvpoke runtime semantics are used as compatibility tests and validation targets, not as a direct internal schema mirror.
+- The engine must preserve timing semantics even when the internal state representation differs from the reference runtime.
+
+### 7.2 Timing semantics
+
+- Damage resolves at the end of each turn.
+- Charged Attacks begin at the start of the following turn.
+- Energy gained during a turn is not spendable until the next turn.
+- A valid charged move remains able to resolve in the attack sequence even when the target would otherwise faint from a fast move.
+
+### 7.3 Shield and damage mitigation
+
+- Shield decisions are requested during turn resolution and do not advance the turn counter.
+- Shields mitigate pending incoming damage before final HP reduction.
+- If a shield decision is missing or malformed, the deterministic fallback is no-shield.
+
+### 7.4 Swap semantics
+
+- Swaps resolve before damage.
+- Quick swaps cost a full turn.
+- Forced swaps after fainting do not consume a turn.
+- Swap execution remains deterministic and independent of input timing variance.
+
+### 7.5 Module ownership and boundaries
+
+- The engine owns the immutable battle snapshot and the turn transition function.
+- The player layer owns observation generation and normalized action selection.
+- The resolver owns action ordering, shield resolution, and combat effects.
+- Replay/history and presentation code are external to live battle state and must not mutate engine state in place.
+
+### 7.6 Validation strategy
+
+Validation must be treated as part of the engine contract and must include:
+
+- deterministic turn-ordering tests
+- snapshot-transition output assertions
+- replay fidelity and event-log validation
+- observation compatibility and visibility checks
+- battle regression cases for shield, swap, and charged-move timing edge scenarios
+
+## 8. Compatibility and Migration Strategy
+
+### 8.1 Early milestone behavior
 
 The immediate implementation should remain compatible with the current 1v1 battle structure so that legacy logic can be validated before broadening the engine.
 
@@ -256,7 +303,7 @@ This includes:
 - keeping the first milestone focused on a single battle shape while the architecture scales
 - confirming that the new action and state interfaces still work for the basic 1v1 path
 
-### 7.2 Scaling toward NvN
+### 8.2 Scaling toward NvN
 
 Once the 1v1 compatibility contract is stable, the engine can be generalized by:
 
@@ -265,7 +312,7 @@ Once the 1v1 compatibility contract is stable, the engine can be generalized by:
 - generalizing the action resolution stage from pairwise to any number of actors
 - preserving the same immutability and replay principles across all battle sizes
 
-## 8. Required Runtime Properties
+## 9. Required Runtime Properties
 
 The implementation should guarantee the following properties:
 
@@ -276,7 +323,7 @@ The implementation should guarantee the following properties:
 - safe termination when turn or time budgets are exceeded
 - logging/export of every state transition for later investigation
 
-### 8.1 Battle output result contract
+### 9.1 Battle output result contract
 
 For the initial 1v1 compatibility milestone, the engine must expose a battle result payload whose semantics match the documented pvpoke-runtime output contract.
 
@@ -293,7 +340,7 @@ $$
 
 This contract is the compatibility target for the first milestone: the simulator’s 1v1 result should be substantially similar to the existing pvpoke battle result value, so that the same encounter can be used as a verification baseline.
 
-## 9. Success Criteria
+## 10. Success Criteria
 
 The work is considered complete when:
 
