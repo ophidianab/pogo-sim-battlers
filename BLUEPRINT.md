@@ -203,6 +203,16 @@ Initialization uses the CPM and the catalog's base stats with the supplied IVs:
 
 The stored attack and defense are unmodified initialization values. Shadow modifiers and in-battle stat stages are applied by the battle resolver, not during this calculation. Invalid IVs and levels without an exact CPM entry are rejected.
 
+### Type effectiveness compatibility contract
+
+- `engine/data/type_chart.json` mirrors the defensive-type trait lists from PvPoke `DamageCalculator.js`: weaknesses, resistances, and immunities for all 18 types.
+- Type names are parsed into the `PokemonType` enum; incomplete charts and unknown type names are rejected during catalog loading.
+- The Pokémon data's `none` secondary-type sentinel is represented explicitly and contributes neutral effectiveness; it is not a nineteenth chart entry.
+- Effectiveness starts at `1.0` and multiplies one applicable factor for each defending type, checking weakness, resistance, then immunity in that order.
+- PvPoke's `immunities` use `DOUBLE_RESISTED = 0.390625`; they do not make effectiveness zero.
+- The chart's list ordering is preserved in the asset. Trait-list order does not alter the result because each list is membership-tested.
+- Damage constants are defined once in `DamageConstants` using the exact PvPoke values.
+
 Proposed JSON schema for the normalized action contract:
 
 ```json

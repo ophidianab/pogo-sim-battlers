@@ -97,6 +97,7 @@ The simulator should continue to use a team-based structure for Pokémon GO-styl
 - each Pokémon records HP, energy, cooldowns, statuses, and current move availability
 - each Pokémon's battle state includes initialized effective attack and defense values derived from its species, IVs, and level/CP multiplier; these are stored before in-battle stat stages and shadow modifiers
 - the level-to-CPM values are a data asset indexed directly at half-level increments; unsupported levels are rejected rather than interpolated
+- type effectiveness uses the PvPoke defensive-type trait chart for all 18 types; weakness, resistance, and immunity modifiers multiply across a defender's types, with immunity applying the documented double-resisted multiplier; the source data's `none` secondary-type sentinel is neutral
 - battle-relevant data remains derived from the central immutable turn snapshot
 
 ## 4. Turn Resolution Model

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
@@ -12,7 +12,7 @@ pub struct MoveDefinition {
     pub move_id: String,
     pub name: String,
     #[serde(rename = "type")]
-    pub move_type: String,
+    pub move_type: PokemonType,
     pub power: u32,
     pub energy: u32,
     pub energy_gain: u32,
@@ -35,9 +35,76 @@ pub struct PokemonDefinition {
     pub species_id: String,
     pub species_name: String,
     pub base_stats: BaseStats,
-    pub types: Vec<String>,
+    pub types: Vec<PokemonType>,
     pub fast_moves: Vec<String>,
     pub charged_moves: Vec<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PokemonType {
+    Normal,
+    Fighting,
+    Flying,
+    Poison,
+    Ground,
+    Rock,
+    Bug,
+    Ghost,
+    Steel,
+    Fire,
+    Water,
+    Grass,
+    Electric,
+    Psychic,
+    Ice,
+    Dragon,
+    Dark,
+    Fairy,
+    None,
+}
+
+impl PokemonType {
+    const ALL: [Self; 18] = [
+        Self::Normal,
+        Self::Fighting,
+        Self::Flying,
+        Self::Poison,
+        Self::Ground,
+        Self::Rock,
+        Self::Bug,
+        Self::Ghost,
+        Self::Steel,
+        Self::Fire,
+        Self::Water,
+        Self::Grass,
+        Self::Electric,
+        Self::Psychic,
+        Self::Ice,
+        Self::Dragon,
+        Self::Dark,
+        Self::Fairy,
+    ];
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+pub struct TypeTraits {
+    pub resistances: Vec<PokemonType>,
+    pub weaknesses: Vec<PokemonType>,
+    pub immunities: Vec<PokemonType>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct DamageConstants;
+
+impl DamageConstants {
+    pub const BONUS: f64 = 1.2999999523162841796875;
+    pub const SUPER_EFFECTIVE: f64 = 1.60000002384185791015625;
+    pub const RESISTED: f64 = 0.625;
+    pub const DOUBLE_RESISTED: f64 = 0.390625;
+    pub const STAB: f64 = 1.2000000476837158203125;
+    pub const SHADOW_ATK: f64 = 1.2;
+    pub const SHADOW_DEF: f64 = 0.83333331;
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -79,6 +146,7 @@ pub struct DataCatalog {
     moves: HashMap<String, MoveDefinition>,
     pokemon: HashMap<String, PokemonDefinition>,
     cpm_table: CpmTable,
+    type_traits: HashMap<PokemonType, TypeTraits>,
 }
 
 #[derive(Debug)]
@@ -98,6 +166,7 @@ impl DataCatalog {
             include_str!("../data/moves.json"),
             include_str!("../data/pokemon.json"),
             include_str!("../data/cpm.json"),
+            include_str!("../data/type_chart.json"),
         )
     }
 
@@ -105,6 +174,7 @@ impl DataCatalog {
         moves_json: &str,
         pokemon_json: &str,
         cpm_json: &str,
+        type_chart_json: &str,
     ) -> Result<Self, DataCatalogError> {
         let move_definitions: Vec<MoveDefinition> = serde_json::from_str(moves_json)
             .map_err(|error| DataCatalogError(format!("invalid move data: {error}")))?;
@@ -112,6 +182,9 @@ impl DataCatalog {
             .map_err(|error| DataCatalogError(format!("invalid Pokemon data: {error}")))?;
         let cpm_table: CpmTable = serde_json::from_str(cpm_json)
             .map_err(|error| DataCatalogError(format!("invalid CPM data: {error}")))?;
+        let type_traits: HashMap<PokemonType, TypeTraits> =
+            serde_json::from_str(type_chart_json)
+                .map_err(|error| DataCatalogError(format!("invalid type chart data: {error}")))?;
 
         if !cpm_table.starting_level.is_finite()
             || !cpm_table.level_step.is_finite()
@@ -124,6 +197,7 @@ impl DataCatalog {
         {
             return Err(DataCatalogError("invalid CPM table values".to_owned()));
         }
+        validate_type_chart(&type_traits)?;
 
         let moves = unique_by_key(move_definitions, |definition| definition.move_id.clone())
             .map_err(|key| DataCatalogError(format!("duplicate move id: {key}")))?;
@@ -136,6 +210,7 @@ impl DataCatalog {
             moves,
             pokemon,
             cpm_table,
+            type_traits,
         })
     }
 
@@ -151,6 +226,34 @@ impl DataCatalog {
         self.move_definition(move_id)
             .filter(|definition| definition.energy > 0)
             .map(|definition| definition.energy)
+    }
+
+    pub fn type_effectiveness(
+        &self,
+        move_type: PokemonType,
+        target_types: &[PokemonType],
+    ) -> Result<f64, DataCatalogError> {
+        let mut effectiveness = 1.0;
+
+        for target_type in target_types {
+            if *target_type == PokemonType::None {
+                continue;
+            }
+
+            let traits = self.type_traits.get(target_type).ok_or_else(|| {
+                DataCatalogError(format!("missing type traits for {target_type:?}"))
+            })?;
+
+            if traits.weaknesses.contains(&move_type) {
+                effectiveness *= DamageConstants::SUPER_EFFECTIVE;
+            } else if traits.resistances.contains(&move_type) {
+                effectiveness *= DamageConstants::RESISTED;
+            } else if traits.immunities.contains(&move_type) {
+                effectiveness *= DamageConstants::DOUBLE_RESISTED;
+            }
+        }
+
+        Ok(effectiveness)
     }
 
     pub fn cp_multiplier(&self, level: f64) -> Option<f64> {
@@ -219,11 +322,43 @@ fn unique_by_key<T>(
     Ok(by_key)
 }
 
+fn validate_type_chart(
+    type_traits: &HashMap<PokemonType, TypeTraits>,
+) -> Result<(), DataCatalogError> {
+    if type_traits.len() != PokemonType::ALL.len()
+        || PokemonType::ALL
+            .iter()
+            .any(|pokemon_type| !type_traits.contains_key(pokemon_type))
+    {
+        return Err(DataCatalogError(
+            "type chart must define each of the 18 Pokemon types exactly once".to_owned(),
+        ));
+    }
+
+    for (defending_type, traits) in type_traits {
+        let mut seen = HashSet::new();
+        for attacking_type in traits
+            .weaknesses
+            .iter()
+            .chain(&traits.resistances)
+            .chain(&traits.immunities)
+        {
+            if !seen.insert(*attacking_type) {
+                return Err(DataCatalogError(format!(
+                    "duplicate or conflicting {attacking_type:?} trait for {defending_type:?}"
+                )));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use crate::model::PokemonBuildInput;
 
-    use super::{DataCatalog, StatInitializationError};
+    use super::{DamageConstants, DataCatalog, PokemonType, StatInitializationError};
 
     #[test]
     fn embedded_catalog_loads_move_costs_and_pokemon_stats() {
@@ -235,7 +370,11 @@ mod tests {
 
         let bulbasaur = catalog.pokemon_definition("bulbasaur").unwrap();
         assert_eq!(bulbasaur.base_stats.atk, 118);
-        assert_eq!(bulbasaur.types, ["grass", "poison"]);
+        assert_eq!(bulbasaur.types, [PokemonType::Grass, PokemonType::Poison]);
+        assert_eq!(
+            catalog.pokemon_definition("charmander").unwrap().types,
+            [PokemonType::Fire, PokemonType::None]
+        );
         assert_eq!(catalog.charged_move_cost("POWER_WHIP"), Some(50));
         assert_eq!(catalog.cp_multiplier(1.0), Some(0.0939999967813491));
         assert_eq!(catalog.cp_multiplier(1.5), Some(0.135137430784308));
@@ -244,6 +383,42 @@ mod tests {
         assert_eq!(catalog.cp_multiplier(55.0), Some(0.865299999713897));
         assert_eq!(catalog.cp_multiplier(55.5), None);
         assert_eq!(catalog.cp_multiplier(1.25), None);
+    }
+
+    #[test]
+    fn type_effectiveness_matches_pvpoke_single_and_dual_type_rules() {
+        let catalog = DataCatalog::embedded().unwrap();
+
+        assert_eq!(
+            catalog
+                .type_effectiveness(PokemonType::Fighting, &[PokemonType::Normal])
+                .unwrap(),
+            DamageConstants::SUPER_EFFECTIVE
+        );
+        assert_eq!(
+            catalog
+                .type_effectiveness(PokemonType::Ghost, &[PokemonType::Normal])
+                .unwrap(),
+            DamageConstants::DOUBLE_RESISTED
+        );
+        assert_eq!(
+            catalog
+                .type_effectiveness(PokemonType::Water, &[PokemonType::Fire, PokemonType::Grass])
+                .unwrap(),
+            DamageConstants::SUPER_EFFECTIVE * DamageConstants::RESISTED
+        );
+        assert_eq!(
+            catalog
+                .type_effectiveness(PokemonType::Flying, &[PokemonType::Grass, PokemonType::Bug])
+                .unwrap(),
+            DamageConstants::SUPER_EFFECTIVE.powi(2)
+        );
+        assert_eq!(
+            catalog
+                .type_effectiveness(PokemonType::Ground, &[PokemonType::None])
+                .unwrap(),
+            1.0
+        );
     }
 
     #[test]
@@ -303,7 +478,8 @@ mod tests {
         let pokemon = "[]";
 
         let cpm = r#"{"startingLevel":1.0,"levelStep":0.5,"values":[0.1]}"#;
-        let error = DataCatalog::from_json(moves, pokemon, cpm).unwrap_err();
+        let type_chart = include_str!("../data/type_chart.json");
+        let error = DataCatalog::from_json(moves, pokemon, cpm, type_chart).unwrap_err();
 
         assert_eq!(error.to_string(), "duplicate move id: DUP");
     }
