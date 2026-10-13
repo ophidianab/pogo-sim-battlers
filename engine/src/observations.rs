@@ -202,6 +202,7 @@ mod tests {
                 participant("left", Side::Left, 75),
                 participant("right", Side::Right, 50),
             ],
+            pending_charged_moves: Vec::new(),
             pending_forced_swaps: Vec::new(),
             timeline: vec![TurnRecord {
                 turn: 7,

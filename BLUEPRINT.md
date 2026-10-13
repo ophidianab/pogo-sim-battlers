@@ -86,6 +86,7 @@ Initial JSON-style shape for the snapshot root:
   "battleId": "string",
   "turn": 0,
   "participants": [],
+  "pendingChargedMoves": [],
   "pendingForcedSwaps": [],
   "timeline": [],
   "metadata": {}
@@ -95,6 +96,8 @@ Initial JSON-style shape for the snapshot root:
 The `participants` array will contain ordered participant entries with per-side roster and active-slot information, and the implementation will later map this contract into Rust structs.
 
 Each `pendingForcedSwaps` entry contains the participant ID and the eligible bench slot IDs in roster order. It is empty unless a faint leaves that participant with multiple living replacements to choose from; a sole replacement is selected automatically.
+
+Each `pendingChargedMoves` entry contains the participant ID and selected move ID. A charged action spends its energy when queued, resolves at the start of the following turn before fast-move damage, and occupies that participant's action slot for that turn. The pending entry is cleared after resolution or if its user faints first.
 
 Battle initialization accepts a build input for each Pokémon. The caller supplies species, level, IVs, and shadow status; the initializer derives HP and effective combat stats once and stores the resulting values in the battle snapshot.
 
@@ -476,6 +479,18 @@ When a charged move targets a defender during turn resolution, the engine reques
 - **Based on observation**: the defender decides using their visible state (own HP, energy, opponent's visible state, remaining shields)
 - **Asynchronous within turn**: the decision occurs during turn resolution and does not consume a turn or action slot
 - **Deterministic fallback**: if the defender cannot or does not respond, the default is no-shield
+
+The shield response is a separate request, not a player action:
+
+```json
+{
+  "participantId": "string",
+  "turn": 0,
+  "decision": "shield | no_shield"
+}
+```
+
+Only one matching decision for the defending participant and current turn is accepted. Missing, duplicate, stale, or unavailable shield decisions resolve as no-shield. A shield request contains no incoming move identity or damage information.
 
 ### 6.4 Robustness requirement
 

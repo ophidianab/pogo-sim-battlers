@@ -5,8 +5,8 @@ use crate::actions::normalize_actions;
 use crate::damage::{DamageCombatant, calculate_damage};
 use crate::data::DataCatalog;
 use crate::model::{
-    ActionRequest, BattleSnapshot, PendingForcedSwap, PlayerAction, TimelineEvent,
-    TimelineEventKind, TurnRecord,
+    ActionRequest, BattleSnapshot, PendingChargedMove, PendingForcedSwap, PlayerAction,
+    ShieldDecision, ShieldDecisionRequest, TimelineEvent, TimelineEventKind, TurnRecord,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -63,6 +63,15 @@ pub fn resolve_turn(
     requests: &[ActionRequest],
     catalog: &DataCatalog,
 ) -> Result<TurnTransition, TransitionError> {
+    resolve_turn_with_shield_decisions(snapshot, requests, &[], catalog)
+}
+
+pub fn resolve_turn_with_shield_decisions(
+    snapshot: &BattleSnapshot,
+    requests: &[ActionRequest],
+    shield_decisions: &[ShieldDecisionRequest],
+    catalog: &DataCatalog,
+) -> Result<TurnTransition, TransitionError> {
     if snapshot.participants.len() != 2 {
         return Err(TransitionError::ParticipantCount);
     }
@@ -70,7 +79,17 @@ pub fn resolve_turn(
         return resolve_pending_forced_swaps(snapshot, requests);
     }
 
-    let normalized = normalize_actions(snapshot, requests, catalog);
+    let actionable_requests: Vec<_> = requests
+        .iter()
+        .filter(|request| {
+            !snapshot
+                .pending_charged_moves
+                .iter()
+                .any(|pending| pending.participant_id == request.participant_id)
+        })
+        .cloned()
+        .collect();
+    let normalized = normalize_actions(snapshot, &actionable_requests, catalog);
     let mut next_snapshot = snapshot.clone();
     let mut timeline_entries = Vec::new();
 
@@ -97,6 +116,136 @@ pub fn resolve_turn(
         });
     }
 
+    let mut fainted_participants = Vec::new();
+    let mut charged_order = snapshot.pending_charged_moves.clone();
+    charged_order.sort_by(|left, right| {
+        let left_index = snapshot
+            .participants
+            .iter()
+            .position(|participant| participant.participant_id == left.participant_id)
+            .unwrap_or(usize::MAX);
+        let right_index = snapshot
+            .participants
+            .iter()
+            .position(|participant| participant.participant_id == right.participant_id)
+            .unwrap_or(usize::MAX);
+        let left_attack = snapshot
+            .participants
+            .get(left_index)
+            .and_then(|participant| participant.team.get(participant.active_pokemon_index))
+            .map(|pokemon| pokemon.combat_stats.attack)
+            .unwrap_or_default();
+        let right_attack = snapshot
+            .participants
+            .get(right_index)
+            .and_then(|participant| participant.team.get(participant.active_pokemon_index))
+            .map(|pokemon| pokemon.combat_stats.attack)
+            .unwrap_or_default();
+        right_attack
+            .total_cmp(&left_attack)
+            .then_with(|| left_index.cmp(&right_index))
+    });
+    next_snapshot.pending_charged_moves.clear();
+
+    for pending_charge in charged_order {
+        let Some(attacker_index) = next_snapshot
+            .participants
+            .iter()
+            .position(|participant| participant.participant_id == pending_charge.participant_id)
+        else {
+            continue;
+        };
+        let target_index = 1 - attacker_index;
+        if active_pokemon(&next_snapshot, attacker_index).is_err() {
+            let participant = &mut next_snapshot.participants[attacker_index];
+            if let Some(active) = participant.team.get_mut(participant.active_pokemon_index) {
+                active.move_state.pending_charge = false;
+            }
+            continue;
+        }
+        active_pokemon_mut(&mut next_snapshot, attacker_index)?
+            .move_state
+            .pending_charge = false;
+        if active_pokemon(&next_snapshot, target_index).is_err() {
+            continue;
+        }
+        let move_id = &pending_charge.move_id;
+
+        let move_definition = catalog
+            .move_definition(move_id)
+            .ok_or_else(|| TransitionError::UnknownMove(move_id.clone()))?;
+        let damage = calculate_active_move_damage(
+            &next_snapshot,
+            catalog,
+            attacker_index,
+            target_index,
+            move_id,
+        )?;
+        let target_participant_id = next_snapshot.participants[target_index]
+            .participant_id
+            .clone();
+        let matching_decisions: Vec<_> = shield_decisions
+            .iter()
+            .filter(|decision| {
+                decision.participant_id == target_participant_id && decision.turn == snapshot.turn
+            })
+            .collect();
+        let shielded = matches!(
+            matching_decisions.as_slice(),
+            [decision] if decision.decision == ShieldDecision::Shield
+        ) && next_snapshot.participants[target_index].shields_remaining > 0;
+
+        if shielded {
+            next_snapshot.participants[target_index].shields_remaining -= 1;
+        }
+        let applied_damage = if shielded { 1 } else { damage };
+        timeline_entries.push(TimelineEvent {
+            kind: TimelineEventKind::Charged,
+            participant_id: next_snapshot.participants[attacker_index]
+                .participant_id
+                .clone(),
+            target_participant_id: Some(target_participant_id),
+            move_id: Some(move_id.clone()),
+            damage: Some(applied_damage),
+            shielded: Some(shielded),
+            duration_ms: Some(move_definition.cooldown),
+            species: None,
+        });
+
+        let target = active_pokemon_mut(&mut next_snapshot, target_index)?;
+        let fainted = target.current_hp > 0 && target.current_hp <= applied_damage;
+        target.current_hp = target.current_hp.saturating_sub(applied_damage);
+        if fainted {
+            target.flags.fainted = true;
+            fainted_participants.push(target_index);
+            target.is_active = false;
+            target.reset_stat_stages_on_switch_out();
+        }
+    }
+
+    for (participant_index, action) in normalized.iter().enumerate() {
+        let PlayerAction::ChargedMove { move_id } = &action.action else {
+            continue;
+        };
+        if active_pokemon(&next_snapshot, participant_index).is_err()
+            || active_pokemon(&next_snapshot, 1 - participant_index).is_err()
+        {
+            continue;
+        }
+        let energy_cost = catalog
+            .charged_move_cost(move_id)
+            .ok_or_else(|| TransitionError::UnknownMove(move_id.clone()))?;
+        let attacker = active_pokemon_mut(&mut next_snapshot, participant_index)?;
+        attacker.energy = attacker.energy.saturating_sub(energy_cost);
+        attacker.move_state.pending_charge = true;
+        next_snapshot
+            .pending_charged_moves
+            .push(PendingChargedMove {
+                participant_id: action.participant_id.clone(),
+                move_id: move_id.clone(),
+            });
+    }
+
     let mut pending_moves = Vec::new();
 
     for (attacker_index, action) in normalized.iter().enumerate() {
@@ -104,7 +253,7 @@ pub fn resolve_turn(
         let PlayerAction::FastMove { move_id } = &action.action else {
             if matches!(
                 action.action,
-                PlayerAction::Wait | PlayerAction::Swap { .. }
+                PlayerAction::Wait | PlayerAction::Swap { .. } | PlayerAction::ChargedMove { .. }
             ) {
                 continue;
             }
@@ -113,35 +262,21 @@ pub fn resolve_turn(
             ));
         };
 
-        let attacker = active_pokemon(&next_snapshot, attacker_index)?;
-        let target = active_pokemon(&next_snapshot, target_index)?;
+        if active_pokemon(&next_snapshot, attacker_index).is_err()
+            || active_pokemon(&next_snapshot, target_index).is_err()
+        {
+            continue;
+        }
         let move_definition = catalog
             .move_definition(move_id)
             .ok_or_else(|| TransitionError::UnknownMove(move_id.clone()))?;
-        let attacker_definition = catalog
-            .pokemon_definition(&attacker.species)
-            .ok_or_else(|| TransitionError::UnknownSpecies(attacker.species.clone()))?;
-        let target_definition = catalog
-            .pokemon_definition(&target.species)
-            .ok_or_else(|| TransitionError::UnknownSpecies(target.species.clone()))?;
-        let damage = calculate_damage(
+        let damage = calculate_active_move_damage(
+            &next_snapshot,
             catalog,
-            DamageCombatant {
-                combat_stats: &attacker.combat_stats,
-                stat_stages: &attacker.stat_stages,
-                shadow: attacker.flags.shadow,
-                types: &attacker_definition.types,
-            },
-            DamageCombatant {
-                combat_stats: &target.combat_stats,
-                stat_stages: &target.stat_stages,
-                shadow: target.flags.shadow,
-                types: &target_definition.types,
-            },
-            move_definition,
-            1.0,
-        )
-        .map_err(|error| TransitionError::Damage(error.to_string()))?;
+            attacker_index,
+            target_index,
+            move_id,
+        )?;
 
         pending_moves.push(PendingFastMove {
             attacker_index,
@@ -174,16 +309,44 @@ pub fn resolve_turn(
         timeline_entries.push(pending.event);
     }
 
-    let mut fainted_participants = Vec::new();
     for (target_index, damage) in pending_damage {
         let target = active_pokemon_mut(&mut next_snapshot, target_index)?;
         let fainted = target.current_hp > 0 && target.current_hp <= damage;
         target.current_hp = target.current_hp.saturating_sub(damage);
         if fainted {
             target.flags.fainted = true;
+            target.is_active = false;
+            target.reset_stat_stages_on_switch_out();
             fainted_participants.push(target_index);
         }
     }
+
+    let cancelled_charges: Vec<_> = next_snapshot
+        .pending_charged_moves
+        .iter()
+        .filter(|pending| {
+            !next_snapshot
+                .participants
+                .iter()
+                .find(|participant| participant.participant_id == pending.participant_id)
+                .and_then(|participant| participant.team.get(participant.active_pokemon_index))
+                .is_some_and(|pokemon| pokemon.current_hp > 0 && !pokemon.flags.fainted)
+        })
+        .map(|pending| pending.participant_id.clone())
+        .collect();
+    for participant_id in &cancelled_charges {
+        if let Some(participant) = next_snapshot
+            .participants
+            .iter_mut()
+            .find(|participant| &participant.participant_id == participant_id)
+            && let Some(active) = participant.team.get_mut(participant.active_pokemon_index)
+        {
+            active.move_state.pending_charge = false;
+        }
+    }
+    next_snapshot
+        .pending_charged_moves
+        .retain(|pending| !cancelled_charges.contains(&pending.participant_id));
 
     for participant_index in fainted_participants {
         let outgoing_index = next_snapshot.participants[participant_index].active_pokemon_index;
@@ -250,6 +413,44 @@ pub fn resolve_turn(
         next_snapshot,
         timeline_entries,
     })
+}
+
+fn calculate_active_move_damage(
+    snapshot: &BattleSnapshot,
+    catalog: &DataCatalog,
+    attacker_index: usize,
+    target_index: usize,
+    move_id: &str,
+) -> Result<u32, TransitionError> {
+    let attacker = active_pokemon(snapshot, attacker_index)?;
+    let target = active_pokemon(snapshot, target_index)?;
+    let move_definition = catalog
+        .move_definition(move_id)
+        .ok_or_else(|| TransitionError::UnknownMove(move_id.to_owned()))?;
+    let attacker_definition = catalog
+        .pokemon_definition(&attacker.species)
+        .ok_or_else(|| TransitionError::UnknownSpecies(attacker.species.clone()))?;
+    let target_definition = catalog
+        .pokemon_definition(&target.species)
+        .ok_or_else(|| TransitionError::UnknownSpecies(target.species.clone()))?;
+    calculate_damage(
+        catalog,
+        DamageCombatant {
+            combat_stats: &attacker.combat_stats,
+            stat_stages: &attacker.stat_stages,
+            shadow: attacker.flags.shadow,
+            types: &attacker_definition.types,
+        },
+        DamageCombatant {
+            combat_stats: &target.combat_stats,
+            stat_stages: &target.stat_stages,
+            shadow: target.flags.shadow,
+            types: &target_definition.types,
+        },
+        move_definition,
+        1.0,
+    )
+    .map_err(|error| TransitionError::Damage(error.to_string()))
 }
 
 fn resolve_pending_forced_swaps(
@@ -377,14 +578,15 @@ fn switch_active_to(
 
 #[cfg(test)]
 mod tests {
+    use crate::actions::{FallbackReason, normalize_actions};
     use crate::data::DataCatalog;
     use crate::model::{
         ActionRequest, BattleSnapshot, CombatStats, ControllerType, Cooldowns, MoveState,
-        ParticipantState, PlayerAction, PokemonFlags, PokemonState, Side, StatStages,
-        TimelineEventKind,
+        ParticipantState, PlayerAction, PokemonFlags, PokemonState, ShieldDecision,
+        ShieldDecisionRequest, Side, StatStages, TimelineEventKind,
     };
 
-    use super::resolve_turn;
+    use super::{resolve_turn, resolve_turn_with_shield_decisions};
 
     fn pokemon(slot: usize, species: &str) -> PokemonState {
         PokemonState {
@@ -440,6 +642,7 @@ mod tests {
                 participant("left", Side::Left, "bulbasaur"),
                 participant("right", Side::Right, "squirtle"),
             ],
+            pending_charged_moves: Vec::new(),
             pending_forced_swaps: Vec::new(),
             timeline: Vec::new(),
             metadata: Default::default(),
@@ -490,6 +693,291 @@ mod tests {
         assert_eq!(transition.timeline_entries, next.timeline[0].events);
         assert_eq!(state.participants[0].team[0].current_hp, 100);
         assert_eq!(state.participants[0].team[0].energy, 20);
+    }
+
+    #[test]
+    fn fast_move_energy_is_spendable_only_on_the_following_turn() {
+        let mut state = snapshot();
+        let catalog = DataCatalog::embedded().unwrap();
+        let charged_cost = catalog.charged_move_cost("POWER_WHIP").unwrap();
+        let active = &mut state.participants[0].team[0];
+        active.energy = charged_cost - 1;
+        active
+            .move_state
+            .charged_moves
+            .push("POWER_WHIP".to_owned());
+
+        let same_turn_requests = [
+            ActionRequest {
+                participant_id: "left".to_owned(),
+                turn: state.turn,
+                action: PlayerAction::ChargedMove {
+                    move_id: "POWER_WHIP".to_owned(),
+                },
+            },
+            ActionRequest {
+                participant_id: "right".to_owned(),
+                turn: state.turn,
+                action: PlayerAction::Wait,
+            },
+        ];
+        let normalized = normalize_actions(&state, &same_turn_requests, &catalog);
+        assert_eq!(
+            normalized[0].action,
+            PlayerAction::FastMove {
+                move_id: "TACKLE".to_owned()
+            }
+        );
+        assert_eq!(
+            normalized[0].fallback_reason,
+            Some(FallbackReason::InsufficientEnergy)
+        );
+
+        let transition = resolve_turn(&state, &same_turn_requests, &catalog).unwrap();
+        let next = transition.next_snapshot;
+        let next_active = &next.participants[0].team[0];
+
+        assert!(next_active.energy >= charged_cost);
+        assert_eq!(
+            next.timeline[0].events[0].move_id.as_deref(),
+            Some("TACKLE")
+        );
+
+        let next_turn_requests = [
+            ActionRequest {
+                participant_id: "left".to_owned(),
+                turn: next.turn,
+                action: PlayerAction::ChargedMove {
+                    move_id: "POWER_WHIP".to_owned(),
+                },
+            },
+            ActionRequest {
+                participant_id: "right".to_owned(),
+                turn: next.turn,
+                action: PlayerAction::Wait,
+            },
+        ];
+        let next_turn_normalized = normalize_actions(&next, &next_turn_requests, &catalog);
+
+        assert_eq!(
+            next_turn_normalized[0].action,
+            PlayerAction::ChargedMove {
+                move_id: "POWER_WHIP".to_owned()
+            }
+        );
+        assert_eq!(next_turn_normalized[0].fallback_reason, None);
+        assert_eq!(state.participants[0].team[0].energy, charged_cost - 1);
+    }
+
+    #[test]
+    fn charged_move_shield_decision_reduces_damage_to_one() {
+        let mut state = snapshot();
+        let catalog = DataCatalog::embedded().unwrap();
+        let charged_cost = catalog.charged_move_cost("POWER_WHIP").unwrap();
+        let attacker = &mut state.participants[0].team[0];
+        attacker.energy = charged_cost;
+        attacker
+            .move_state
+            .charged_moves
+            .push("POWER_WHIP".to_owned());
+        state.participants[1].shields_remaining = 1;
+        let actions = [
+            ActionRequest {
+                participant_id: "left".to_owned(),
+                turn: 4,
+                action: PlayerAction::ChargedMove {
+                    move_id: "POWER_WHIP".to_owned(),
+                },
+            },
+            ActionRequest {
+                participant_id: "right".to_owned(),
+                turn: 4,
+                action: PlayerAction::Wait,
+            },
+        ];
+        let queued = resolve_turn(&state, &actions, &catalog).unwrap();
+        let queued_state = queued.next_snapshot;
+        assert_eq!(queued_state.participants[1].team[0].current_hp, 100);
+        assert_eq!(queued_state.participants[0].team[0].energy, 0);
+        assert_eq!(queued_state.pending_charged_moves.len(), 1);
+        assert!(
+            queued_state.participants[0].team[0]
+                .move_state
+                .pending_charge
+        );
+        let next_turn_actions = [
+            ActionRequest {
+                participant_id: "left".to_owned(),
+                turn: 5,
+                action: PlayerAction::FastMove {
+                    move_id: "TACKLE".to_owned(),
+                },
+            },
+            ActionRequest {
+                participant_id: "right".to_owned(),
+                turn: 5,
+                action: PlayerAction::Wait,
+            },
+        ];
+        let shield_decisions = [ShieldDecisionRequest {
+            participant_id: "right".to_owned(),
+            turn: 5,
+            decision: ShieldDecision::Shield,
+        }];
+
+        let shielded = resolve_turn_with_shield_decisions(
+            &queued_state,
+            &next_turn_actions,
+            &shield_decisions,
+            &catalog,
+        )
+        .unwrap();
+        let shielded_next = shielded.next_snapshot;
+        let shielded_event = &shielded_next.timeline[1].events[0];
+        assert_eq!(shielded_next.participants[1].team[0].current_hp, 99);
+        assert_eq!(shielded_next.participants[1].shields_remaining, 0);
+        assert_eq!(shielded_event.kind, TimelineEventKind::Charged);
+        assert_eq!(shielded_event.damage, Some(1));
+        assert_eq!(shielded_event.shielded, Some(true));
+        assert_eq!(shielded_next.timeline[1].events.len(), 1);
+        assert!(
+            !shielded_next.participants[0].team[0]
+                .move_state
+                .pending_charge
+        );
+
+        let unshielded_queue = resolve_turn(&state, &actions, &catalog).unwrap();
+        let unshielded = resolve_turn(
+            &unshielded_queue.next_snapshot,
+            &next_turn_actions,
+            &catalog,
+        )
+        .unwrap();
+        let unshielded_next = unshielded.next_snapshot;
+        let unshielded_event = &unshielded_next.timeline[1].events[0];
+        assert!(unshielded_next.participants[1].team[0].current_hp < 99);
+        assert_eq!(unshielded_next.participants[1].shields_remaining, 1);
+        assert_eq!(unshielded_event.shielded, Some(false));
+        assert!(unshielded_event.damage.unwrap() > 1);
+        assert_eq!(
+            unshielded_next.timeline[1].events[1].kind,
+            TimelineEventKind::Faint
+        );
+        assert!(
+            unshielded_next.timeline[1]
+                .events
+                .iter()
+                .all(|event| event.kind != TimelineEventKind::TapInteraction)
+        );
+    }
+
+    #[test]
+    fn higher_attack_charged_move_resolves_first_and_cancels_fainted_move() {
+        let mut state = snapshot();
+        let catalog = DataCatalog::embedded().unwrap();
+        let charged_cost = catalog.charged_move_cost("POWER_WHIP").unwrap();
+        let left = &mut state.participants[0].team[0];
+        left.current_hp = 1;
+        left.energy = charged_cost;
+        left.move_state.charged_moves.push("POWER_WHIP".to_owned());
+        let right = &mut state.participants[1].team[0];
+        right.energy = charged_cost;
+        right.combat_stats.attack = 200.0;
+        right.move_state.charged_moves.push("POWER_WHIP".to_owned());
+        let requests = [
+            ActionRequest {
+                participant_id: "left".to_owned(),
+                turn: 4,
+                action: PlayerAction::ChargedMove {
+                    move_id: "POWER_WHIP".to_owned(),
+                },
+            },
+            ActionRequest {
+                participant_id: "right".to_owned(),
+                turn: 4,
+                action: PlayerAction::ChargedMove {
+                    move_id: "POWER_WHIP".to_owned(),
+                },
+            },
+        ];
+
+        let queued_transition = resolve_turn(&state, &requests, &catalog).unwrap();
+        let queued = queued_transition.next_snapshot;
+        assert_eq!(queued.pending_charged_moves.len(), 2);
+        assert_eq!(queued.participants[0].team[0].current_hp, 1);
+        assert_eq!(queued.participants[1].team[0].current_hp, 100);
+        assert_eq!(queued.participants[0].team[0].energy, 0);
+        assert_eq!(queued.participants[1].team[0].energy, 0);
+
+        let next_turn_requests = [
+            ActionRequest {
+                participant_id: "left".to_owned(),
+                turn: 5,
+                action: PlayerAction::Wait,
+            },
+            ActionRequest {
+                participant_id: "right".to_owned(),
+                turn: 5,
+                action: PlayerAction::Wait,
+            },
+        ];
+        let transition = resolve_turn(&queued, &next_turn_requests, &catalog).unwrap();
+        let next = transition.next_snapshot;
+        let charged_events: Vec<_> = next.timeline[1]
+            .events
+            .iter()
+            .filter(|event| event.kind == TimelineEventKind::Charged)
+            .collect();
+
+        assert_eq!(charged_events.len(), 1);
+        assert_eq!(charged_events[0].participant_id, "right");
+        assert!(next.participants[0].team[0].flags.fainted);
+        assert_eq!(next.participants[1].team[0].energy, 0);
+        assert!(next.pending_charged_moves.is_empty());
+        assert_eq!(next.timeline[1].events[1].kind, TimelineEventKind::Faint);
+    }
+
+    #[test]
+    fn charged_move_is_cancelled_if_its_user_faints_before_it_starts() {
+        let mut state = snapshot();
+        let catalog = DataCatalog::embedded().unwrap();
+        let charged_cost = catalog.charged_move_cost("POWER_WHIP").unwrap();
+        let attacker = &mut state.participants[0].team[0];
+        attacker.current_hp = 1;
+        attacker.energy = charged_cost;
+        attacker
+            .move_state
+            .charged_moves
+            .push("POWER_WHIP".to_owned());
+        let requests = [
+            ActionRequest {
+                participant_id: "left".to_owned(),
+                turn: 4,
+                action: PlayerAction::ChargedMove {
+                    move_id: "POWER_WHIP".to_owned(),
+                },
+            },
+            ActionRequest {
+                participant_id: "right".to_owned(),
+                turn: 4,
+                action: PlayerAction::FastMove {
+                    move_id: "TACKLE".to_owned(),
+                },
+            },
+        ];
+
+        let transition = resolve_turn(&state, &requests, &catalog).unwrap();
+        let next = transition.next_snapshot;
+
+        assert!(next.participants[0].team[0].flags.fainted);
+        assert!(next.pending_charged_moves.is_empty());
+        assert!(!next.participants[0].team[0].move_state.pending_charge);
+        assert!(
+            next.timeline[0]
+                .events
+                .iter()
+                .all(|event| event.kind != TimelineEventKind::Charged)
+        );
     }
 
     #[test]

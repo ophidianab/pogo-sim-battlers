@@ -124,6 +124,8 @@ At the start of each turn, the engine collects **move action requests** from eac
 
 During turn resolution, when a charged move is queued to hit a target, the engine requests a **shield decision** from the defending participant. This decision is made within the turn, does not consume a turn or action, and is specific to that incoming charged move. The defender makes the shield decision based on their observation state—they know a charged move is incoming but do not see the specific move identity or base damage.
 
+A valid charged-move action spends its energy and queues the move. It resolves at the start of the following turn, before that turn's fast-move damage, and occupies the user's action slot while it resolves. If the user faints before the queued move begins, the move is cancelled.
+
 When a Pokémon faints and multiple living bench Pokémon remain, its trainer must choose the replacement. This forced-switch choice is requested after the faint is known, does not consume a turn, and suspends further turn resolution until a valid choice is made. If exactly one living bench Pokémon remains, it is selected automatically.
 
 ### 4.3 Action resolution order

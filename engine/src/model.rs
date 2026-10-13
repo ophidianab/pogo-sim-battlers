@@ -9,6 +9,8 @@ pub struct BattleSnapshot {
     pub turn: u32,
     pub participants: Vec<ParticipantState>,
     #[serde(default)]
+    pub pending_charged_moves: Vec<PendingChargedMove>,
+    #[serde(default)]
     pub pending_forced_swaps: Vec<PendingForcedSwap>,
     #[serde(default)]
     pub timeline: Vec<TurnRecord>,
@@ -33,6 +35,13 @@ pub struct ParticipantState {
 pub struct PendingForcedSwap {
     pub participant_id: String,
     pub options: Vec<usize>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PendingChargedMove {
+    pub participant_id: String,
+    pub move_id: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -226,6 +235,14 @@ pub enum PlayerAction {
 pub enum ShieldDecision {
     Shield,
     NoShield,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShieldDecisionRequest {
+    pub participant_id: String,
+    pub turn: u32,
+    pub decision: ShieldDecision,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

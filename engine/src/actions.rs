@@ -228,6 +228,7 @@ mod tests {
                 shields_remaining: 2,
                 switch_cooldown_turns: 0,
             }],
+            pending_charged_moves: Vec::new(),
             pending_forced_swaps: Vec::new(),
             timeline: Vec::new(),
             metadata: Default::default(),
