@@ -9,6 +9,8 @@ pub struct BattleSnapshot {
     pub turn: u32,
     pub participants: Vec<ParticipantState>,
     #[serde(default)]
+    pub pending_forced_swaps: Vec<PendingForcedSwap>,
+    #[serde(default)]
     pub timeline: Vec<TurnRecord>,
     #[serde(default)]
     pub metadata: BTreeMap<String, String>,
@@ -24,6 +26,13 @@ pub struct ParticipantState {
     pub team: Vec<PokemonState>,
     pub shields_remaining: u8,
     pub switch_cooldown_turns: u32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PendingForcedSwap {
+    pub participant_id: String,
+    pub options: Vec<usize>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -237,6 +246,7 @@ pub struct SelfObservation {
     pub side: Side,
     pub active: ObservedPokemon,
     pub bench: Vec<ObservedPokemon>,
+    pub forced_switch_options: Vec<ObservedPokemon>,
     pub shields: u8,
     pub switch_cooldown_turns: u32,
     pub move_usage_history: Vec<String>,
@@ -306,6 +316,7 @@ pub struct TimelineEvent {
 pub enum TimelineEventKind {
     TapInteraction,
     Charged,
+    Swap,
     SwitchAvailable,
     Faint,
     TapInteractionWait,

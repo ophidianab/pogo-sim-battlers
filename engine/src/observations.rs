@@ -47,12 +47,10 @@ pub fn build_observation(
     let active = participant
         .team
         .get(participant.active_pokemon_index)
-        .filter(|pokemon| !pokemon.flags.fainted && pokemon.current_hp > 0)
         .ok_or(ObservationError::InvalidActivePokemon)?;
     let opponent_active = opponent
         .team
         .get(opponent.active_pokemon_index)
-        .filter(|pokemon| !pokemon.flags.fainted && pokemon.current_hp > 0)
         .ok_or(ObservationError::InvalidActivePokemon)?;
 
     let bench = participant
@@ -61,6 +59,20 @@ pub fn build_observation(
         .enumerate()
         .filter(|(index, _)| *index != participant.active_pokemon_index)
         .map(|(_, pokemon)| observed_pokemon(pokemon))
+        .collect();
+    let forced_switch_options = state
+        .pending_forced_swaps
+        .iter()
+        .find(|pending| pending.participant_id == participant.participant_id)
+        .into_iter()
+        .flat_map(|pending| pending.options.iter())
+        .filter_map(|slot| {
+            participant
+                .team
+                .iter()
+                .find(|pokemon| pokemon.slot == *slot)
+                .map(observed_pokemon)
+        })
         .collect();
     let last_used_move = state.timeline.last().and_then(|turn| {
         turn.events
@@ -81,6 +93,7 @@ pub fn build_observation(
             side: participant.side.clone(),
             active: observed_pokemon(active),
             bench,
+            forced_switch_options,
             shields: participant.shields_remaining,
             switch_cooldown_turns: participant.switch_cooldown_turns,
             move_usage_history: state
@@ -189,6 +202,7 @@ mod tests {
                 participant("left", Side::Left, 75),
                 participant("right", Side::Right, 50),
             ],
+            pending_forced_swaps: Vec::new(),
             timeline: vec![TurnRecord {
                 turn: 7,
                 timestamp: 3500,
@@ -213,7 +227,7 @@ mod tests {
         battle_state.participants[0].team[0]
             .stat_stages
             .apply_attack_delta(1);
-        let observation = build_observation(&battle_state, "left", "2.0", 1).unwrap();
+        let observation = build_observation(&battle_state, "left", "2.1", 1).unwrap();
 
         assert_eq!(observation.self_view.active.current_hp, 75);
         assert_eq!(observation.self_view.active.energy, 40);
@@ -236,8 +250,32 @@ mod tests {
 
     #[test]
     fn observation_rejects_unknown_participant() {
-        let error = build_observation(&state(), "missing", "2.0", 1).unwrap_err();
+        let error = build_observation(&state(), "missing", "2.1", 1).unwrap_err();
 
         assert_eq!(error, ObservationError::ParticipantNotFound);
+    }
+
+    #[test]
+    fn observation_exposes_forced_switch_candidates_after_faint() {
+        let mut battle_state = state();
+        battle_state.participants[0].team[0].current_hp = 0;
+        battle_state.participants[0].team[0].flags.fainted = true;
+        battle_state.participants[0].team[0].is_active = false;
+        battle_state
+            .pending_forced_swaps
+            .push(crate::model::PendingForcedSwap {
+                participant_id: "left".to_owned(),
+                options: vec![1],
+            });
+
+        let observation = build_observation(&battle_state, "left", "2.1", 1).unwrap();
+
+        assert_eq!(observation.self_view.active.current_hp, 0);
+        assert_eq!(observation.self_view.forced_switch_options.len(), 1);
+        assert_eq!(observation.self_view.forced_switch_options[0].slot, 1);
+        assert_eq!(
+            observation.self_view.forced_switch_options[0].species,
+            "Bench"
+        );
     }
 }

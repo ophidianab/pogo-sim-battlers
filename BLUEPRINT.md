@@ -86,12 +86,15 @@ Initial JSON-style shape for the snapshot root:
   "battleId": "string",
   "turn": 0,
   "participants": [],
+  "pendingForcedSwaps": [],
   "timeline": [],
   "metadata": {}
 }
 ```
 
 The `participants` array will contain ordered participant entries with per-side roster and active-slot information, and the implementation will later map this contract into Rust structs.
+
+Each `pendingForcedSwaps` entry contains the participant ID and the eligible bench slot IDs in roster order. It is empty unless a faint leaves that participant with multiple living replacements to choose from; a sole replacement is selected automatically.
 
 Battle initialization accepts a build input for each Pokémon. The caller supplies species, level, IVs, and shadow status; the initializer derives HP and effective combat stats once and stores the resulting values in the battle snapshot.
 
@@ -245,7 +248,7 @@ Proposed JSON schema for the observation payload contract:
 
 ```json
 {
-  "observationVersion": "2.0",
+  "observationVersion": "2.1",
   "turn": 0,
   "self": {
     "participantId": "string",
@@ -260,6 +263,7 @@ Proposed JSON schema for the observation payload contract:
         "defense": 0
       }
     },
+    "forcedSwitchOptions": [],
     "bench": [
       {
         "slot": 1,
@@ -460,6 +464,8 @@ Expected action families:
 - wait
 - future normalized battle actions
 
+When `forcedSwitchOptions` is non-empty, the participant must submit a `swap` action selecting one of those slots. This is a no-turn continuation, not a quick swap. The pending choice remains in the snapshot if the request is missing, stale, duplicated, or selects an unavailable slot.
+
 **Note**: Shield decisions are **not** part of the action contract. Shield decisions are requested asynchronously during turn resolution when a charged move is about to hit the target. They do not advance the turn counter and are a separate decision interface.
 
 ### 6.3 Shield decision contract
@@ -630,7 +636,7 @@ For fast moves in queue:
 2. Apply all energy gains (cannot be used until next turn)
 3. Reset fast move cooldowns for completed moves
 4. Detect any faints from queued damage
-5. Process forced swaps (auto-select next available bench Pokémon)
+5. Process forced swaps: auto-select the sole living bench Pokémon; when multiple living bench Pokémon remain, persist their slots as a pending choice for that trainer
 6. Record timeline events for all actions and damage
 7. Finalize snapshot for next turn
 
@@ -641,6 +647,7 @@ For fast moves in queue:
 - **CMP controls charged move ordering**: higher attack stat charged move resolves first; if it kills, opponent's charged move does not fire
 - **Forced completion of in-progress fast moves**: when opponent uses charged move, any in-progress fast move completes immediately (but only applies damage if attacker survives the charged move)
 - **Left-to-right tiebreaker**: for actions of the same type with equal priority, participant-0 (left side) executes before participant-1 (right side)
+- **Forced replacement choice**: candidate slots are emitted in roster order; the trainer chooses among multiple living candidates without consuming a turn, and the sole living candidate is selected automatically
 
 ### 13.8 Timeline events
 
@@ -679,6 +686,8 @@ The following design decisions have been accepted and are now part of the implem
 - Swaps resolve before damage.
 - Quick swaps consume a turn.
 - Forced swaps after a faint do not consume a turn.
+- If multiple living bench Pokémon remain after a faint, the trainer chooses the replacement; if exactly one remains, select it automatically.
+- Pending forced-switch choices are snapshot state and are exposed to that participant as `forcedSwitchOptions` until a valid slot is selected.
 - Swap timing remains deterministic and does not depend on network variance.
 - When a Pokémon leaves the active slot and enters the bench, reset `statStages` to zero. Preserve persistent state such as HP and energy.
 

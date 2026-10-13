@@ -46,7 +46,7 @@ Implement the first milestone: a deterministic 1v1 battle engine that uses immut
 - Implement end-of-turn damage resolution.
 - Implement energy gain timing and same-turn spending rules.
 - Implement shield resolution and fallback behavior.
-- Implement forced swaps after fainting.
+- Implement forced replacement choices after fainting; auto-select only when exactly one living bench Pokémon remains.
 - Implement tie-breaking and priority ordering.
 
 ### Acceptance criteria
@@ -74,7 +74,7 @@ Implement the first milestone: a deterministic 1v1 battle engine that uses immut
 ### Tasks
 - Add unit tests for move timing and shield logic.
 - Add tests for swap-before-damage semantics.
-- Add tests for forced swap after faint.
+- Add tests for sole-candidate auto-switch and trainer-selected replacement when multiple bench Pokémon remain.
 - Add tests for energy timing and same-turn spending rules.
 - Add replay fidelity tests.
 - Add observation contract validation tests.

@@ -23,7 +23,7 @@ The main design gaps have been closed. The project now has an accepted architect
 - [x] Defined action collection and ordering for each participant.
 - [x] Resolved fast moves, charged moves, swaps, waits, and forced swaps.
 - [x] Defined end-of-turn damage and energy-gain application.
-- [x] Defined forced-swap behavior when a Pokémon faints.
+- [x] Defined forced replacement selection: trainer chooses among multiple living bench Pokémon; a sole candidate is selected automatically, with no turn cost.
 - [x] Defined deterministic tie-breaking and priority rules.
 - [x] Defined fallback behavior for invalid or incomplete actions.
 

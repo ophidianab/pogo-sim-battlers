@@ -124,6 +124,8 @@ At the start of each turn, the engine collects **move action requests** from eac
 
 During turn resolution, when a charged move is queued to hit a target, the engine requests a **shield decision** from the defending participant. This decision is made within the turn, does not consume a turn or action, and is specific to that incoming charged move. The defender makes the shield decision based on their observation state—they know a charged move is incoming but do not see the specific move identity or base damage.
 
+When a Pokémon faints and multiple living bench Pokémon remain, its trainer must choose the replacement. This forced-switch choice is requested after the faint is known, does not consume a turn, and suspends further turn resolution until a valid choice is made. If exactly one living bench Pokémon remains, it is selected automatically.
+
 ### 4.3 Action resolution order
 
 The engine resolves actions according to the deterministic battle rules already established by the existing system, with the following specifics:
@@ -167,7 +169,7 @@ After all charged and fast move actions are queued:
 - Apply all energy gains (energy gained in turn N is available starting turn N+1, not usable in the same turn)
 - Reset fast-move cooldowns for completed moves
 - Detect faints from queued damage
-- Process forced swaps (auto-select next available bench Pokémon if active Pokémon faints)
+- Process forced swaps: auto-select the sole living bench Pokémon, or persist a pending choice when multiple living bench Pokémon remain
 - Record timeline events
 
 #### Determinism guarantees
@@ -178,7 +180,7 @@ These rules ensure the following:
 - **No energy can be spent in the turn it is gained**: energy becomes available only in the following turn
 - **Swaps resolve before damage**: swap timing is deterministic and cannot be affected by incoming damage
 - **CMP controls charged move ordering**: higher attack stat moves resolve first; if fatal, the opponent's charged move is cancelled
-- **Forced-swap behavior is deterministic**: faints trigger automatic swap to the next available bench Pokémon at the end of the turn
+- **Forced-swap options are deterministic**: the living bench options are recorded in roster order; the trainer chooses when multiple options remain, while a sole option is selected automatically
 
 These rules remain the basis for correctness, even as the number of participants grows from 2 to N.
 
