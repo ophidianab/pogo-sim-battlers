@@ -22,7 +22,7 @@ Each turn is represented as an immutable snapshot of game state. The snapshot co
 
 - participant roster and team composition
 - active slot assignments
-- current HP, energy, cooldowns, and status effects
+- current HP, energy, cooldowns, and stat stages
 - pending effects and queued actions
 - turn index and event metadata
 
@@ -94,8 +94,9 @@ The simulator should continue to use a team-based structure for Pokémon GO-styl
 - each participant may have one active Pokémon and a bench or reserve set
 - a team may be 1-to-3 Pokémon in the current 1v1 compatibility path, and can be generalized to a larger roster for NvN
 - battle setup receives each Pokémon's species, level, IV spread, and shadow status, then derives its initialized HP and combat stats
-- each Pokémon records HP, energy, cooldowns, statuses, and current move availability
+- each Pokémon records HP, energy, cooldowns, stat stages, and current move availability
 - each Pokémon's battle state includes initialized effective attack and defense values derived from its species, IVs, and level/CP multiplier; these are stored before in-battle stat stages and shadow modifiers
+- attack and defense stat stages are explicit integers, start at zero, and clamp to `-4..=4`; they affect damage but not CMP
 - the level-to-CPM values are a data asset indexed directly at half-level increments; unsupported levels are rejected rather than interpolated
 - type effectiveness uses the PvPoke defensive-type trait chart for all 18 types; weakness, resistance, and immunity modifiers multiply across a defender's types, with immunity applying the documented double-resisted multiplier; the source data's `none` secondary-type sentinel is neutral
 - battle-relevant data remains derived from the central immutable turn snapshot
@@ -202,7 +203,7 @@ The player interface must not reveal the full internal engine state. Instead it 
 
 - visible team composition and active Pokémon
 - current HP and energy values that are observable in-game
-- active status effects and cooldown windows that are visible to the participant
+- the participant's own stat stages and visible cooldown windows
 - known move availability and charging state
 - the current turn number or turn phase
 - a limited view of opponent information permitted by the ruleset
@@ -277,6 +278,7 @@ The design baseline has been clarified and accepted for implementation as follow
 - Quick swaps cost a full turn.
 - Forced swaps after fainting do not consume a turn.
 - Swap execution remains deterministic and independent of input timing variance.
+- When a Pokémon becomes benched, reset attack/defense stages to zero; HP and energy persist.
 
 ### 7.5 Module ownership and boundaries
 

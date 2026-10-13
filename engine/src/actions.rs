@@ -173,7 +173,7 @@ mod tests {
     use crate::data::DataCatalog;
     use crate::model::{
         BattleSnapshot, CombatStats, ControllerType, Cooldowns, MoveState, ParticipantState,
-        PokemonFlags, PokemonState, Side,
+        PokemonFlags, PokemonState, Side, StatStages,
     };
 
     use super::{FallbackReason, normalize_actions};
@@ -190,9 +190,9 @@ mod tests {
                 attack: 100.0,
                 defense: 100.0,
             },
+            stat_stages: StatStages::default(),
             energy: 20,
             pending_energy_gain: 0,
-            status_effects: Vec::new(),
             cooldowns: Cooldowns {
                 fast_move_ms: 0,
                 charged_move_ms: 0,
@@ -285,5 +285,20 @@ mod tests {
 
         assert_eq!(normalized[0].action, requests[0].action);
         assert_eq!(normalized[0].fallback_reason, None);
+    }
+
+    #[test]
+    fn switching_out_resets_stages_but_preserves_hp_and_energy() {
+        let mut pokemon = pokemon(0, 80, "fast-1", &[]);
+        pokemon.energy = 60;
+        pokemon.stat_stages.apply_attack_delta(2);
+        pokemon.stat_stages.apply_defense_delta(-1);
+
+        pokemon.reset_stat_stages_on_switch_out();
+
+        assert_eq!(pokemon.stat_stages.attack_stage(), 0);
+        assert_eq!(pokemon.stat_stages.defense_stage(), 0);
+        assert_eq!(pokemon.current_hp, 80);
+        assert_eq!(pokemon.energy, 60);
     }
 }

@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 use crate::model::{CombatStats, PokemonBuildInput};
 
@@ -18,6 +18,40 @@ pub struct MoveDefinition {
     pub energy_gain: u32,
     pub cooldown: u32,
     pub turns: u32,
+    #[serde(default)]
+    pub buffs: Option<[i8; 2]>,
+    #[serde(default)]
+    pub buff_target: Option<BuffTarget>,
+    #[serde(default, deserialize_with = "deserialize_buff_apply_chance")]
+    pub buff_apply_chance: Option<f64>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BuffTarget {
+    #[serde(rename = "self")]
+    SelfOnly,
+    Opponent,
+    Both,
+}
+
+fn deserialize_buff_apply_chance<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let serialized_chance = Option::<String>::deserialize(deserializer)?;
+    let Some(serialized_chance) = serialized_chance else {
+        return Ok(None);
+    };
+    let chance = serialized_chance
+        .parse::<f64>()
+        .map_err(serde::de::Error::custom)?;
+    if !chance.is_finite() || !(0.0..=1.0).contains(&chance) {
+        return Err(serde::de::Error::custom(
+            "buff apply chance must be between zero and one",
+        ));
+    }
+    Ok(Some(chance))
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -201,6 +235,7 @@ impl DataCatalog {
 
         let moves = unique_by_key(move_definitions, |definition| definition.move_id.clone())
             .map_err(|key| DataCatalogError(format!("duplicate move id: {key}")))?;
+        validate_move_buffs(moves.values())?;
         let pokemon = unique_by_key(pokemon_definitions, |definition| {
             definition.species_id.clone()
         })
@@ -308,6 +343,23 @@ impl DataCatalog {
     }
 }
 
+fn validate_move_buffs<'a>(
+    moves: impl IntoIterator<Item = &'a MoveDefinition>,
+) -> Result<(), DataCatalogError> {
+    for move_definition in moves {
+        let has_buffs = move_definition.buffs.is_some();
+        let has_target = move_definition.buff_target.is_some();
+        let has_chance = move_definition.buff_apply_chance.is_some();
+        if has_buffs != has_target || has_buffs != has_chance {
+            return Err(DataCatalogError(format!(
+                "move {} must provide buffs, buffTarget, and buffApplyChance together",
+                move_definition.move_id
+            )));
+        }
+    }
+    Ok(())
+}
+
 fn unique_by_key<T>(
     definitions: Vec<T>,
     key_for: impl Fn(&T) -> String,
@@ -358,7 +410,7 @@ fn validate_type_chart(
 mod tests {
     use crate::model::PokemonBuildInput;
 
-    use super::{DamageConstants, DataCatalog, PokemonType, StatInitializationError};
+    use super::{BuffTarget, DamageConstants, DataCatalog, PokemonType, StatInitializationError};
 
     #[test]
     fn embedded_catalog_loads_move_costs_and_pokemon_stats() {
@@ -367,6 +419,11 @@ mod tests {
         let vine_whip = catalog.move_definition("VINE_WHIP").unwrap();
         assert_eq!(vine_whip.energy_gain, 8);
         assert_eq!(vine_whip.turns, 2);
+
+        let icy_wind = catalog.move_definition("ICY_WIND").unwrap();
+        assert_eq!(icy_wind.buffs, Some([-1, 0]));
+        assert_eq!(icy_wind.buff_target, Some(BuffTarget::Opponent));
+        assert_eq!(icy_wind.buff_apply_chance, Some(1.0));
 
         let bulbasaur = catalog.pokemon_definition("bulbasaur").unwrap();
         assert_eq!(bulbasaur.base_stats.atk, 118);
@@ -482,5 +539,21 @@ mod tests {
         let error = DataCatalog::from_json(moves, pokemon, cpm, type_chart).unwrap_err();
 
         assert_eq!(error.to_string(), "duplicate move id: DUP");
+    }
+
+    #[test]
+    fn move_buff_fields_must_be_complete() {
+        let moves = r#"[
+            {"moveId":"PARTIAL","name":"Partial","type":"normal","power":1,"energy":1,"energyGain":0,"cooldown":500,"turns":1,"buffs":[-1,0]}
+        ]"#;
+        let cpm = r#"{"startingLevel":1.0,"levelStep":0.5,"values":[0.1]}"#;
+        let type_chart = include_str!("../data/type_chart.json");
+
+        let error = DataCatalog::from_json(moves, "[]", cpm, type_chart).unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "move PARTIAL must provide buffs, buffTarget, and buffApplyChance together"
+        );
     }
 }

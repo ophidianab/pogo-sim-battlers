@@ -113,7 +113,7 @@ fn observed_pokemon(pokemon: &crate::model::PokemonState) -> ObservedPokemon {
         max_hp: pokemon.max_hp,
         hp_percentage: hp_percentage(pokemon.current_hp, pokemon.max_hp),
         energy: pokemon.energy,
-        status_effects: pokemon.status_effects.clone(),
+        stat_stages: pokemon.stat_stages.clone(),
         fast_move: pokemon.move_state.fast_move.clone(),
         charged_moves: pokemon.move_state.charged_moves.clone(),
     }
@@ -130,7 +130,7 @@ fn hp_percentage(current_hp: u32, max_hp: u32) -> f32 {
 mod tests {
     use crate::model::{
         BattleSnapshot, CombatStats, ControllerType, Cooldowns, MoveState, ParticipantState,
-        PokemonFlags, PokemonState, Side, TimelineEvent, TimelineEventKind, TurnRecord,
+        PokemonFlags, PokemonState, Side, StatStages, TimelineEvent, TimelineEventKind, TurnRecord,
     };
 
     use super::{ObservationError, build_observation};
@@ -147,9 +147,9 @@ mod tests {
                 attack: 100.0,
                 defense: 100.0,
             },
+            stat_stages: StatStages::default(),
             energy: 40,
             pending_energy_gain: 0,
-            status_effects: Vec::new(),
             cooldowns: Cooldowns {
                 fast_move_ms: 0,
                 charged_move_ms: 0,
@@ -209,10 +209,15 @@ mod tests {
 
     #[test]
     fn observation_exposes_self_details_but_limits_opponent_details() {
-        let observation = build_observation(&state(), "left", "1.0", 1).unwrap();
+        let mut battle_state = state();
+        battle_state.participants[0].team[0]
+            .stat_stages
+            .apply_attack_delta(1);
+        let observation = build_observation(&battle_state, "left", "2.0", 1).unwrap();
 
         assert_eq!(observation.self_view.active.current_hp, 75);
         assert_eq!(observation.self_view.active.energy, 40);
+        assert_eq!(observation.self_view.active.stat_stages.attack_stage(), 1);
         assert_eq!(observation.opponent.active.species, "Active");
         assert_eq!(observation.opponent.active.hp_percentage, 50.0);
         assert_eq!(observation.opponent.bench_count, 1);
@@ -223,13 +228,15 @@ mod tests {
 
         let json = serde_json::to_value(observation).unwrap();
         assert!(json.get("self").is_some());
+        assert_eq!(json["self"]["active"]["statStages"]["attack"], 1);
         assert!(json["opponent"]["active"].get("currentHp").is_none());
         assert!(json["opponent"].get("energy").is_none());
+        assert!(json["opponent"]["active"].get("statStages").is_none());
     }
 
     #[test]
     fn observation_rejects_unknown_participant() {
-        let error = build_observation(&state(), "missing", "1.0", 1).unwrap_err();
+        let error = build_observation(&state(), "missing", "2.0", 1).unwrap_err();
 
         assert_eq!(error, ObservationError::ParticipantNotFound);
     }

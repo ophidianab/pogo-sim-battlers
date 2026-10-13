@@ -75,7 +75,7 @@ Required categories of data:
 - team composition and active slots
 - current HP and energy
 - cooldown information
-- status effects and buffs
+- move-defined effects and current stat stages
 - queued actions and pending effects
 - turn index and metadata
 
@@ -127,7 +127,10 @@ Proposed JSON schema for the participant roster and team composition contract:
           "currentHp": 100,
           "maxHp": 100,
           "energy": 0,
-          "statusEffects": [],
+          "statStages": {
+            "attack": 0,
+            "defense": 0
+          },
           "cooldowns": {
             "fastMoveMs": 0,
             "chargedMoveMs": 0
@@ -159,16 +162,12 @@ Proposed JSON schema for the per-Pokémon runtime state contract:
     "attack": 123.45,
     "defense": 145.67
   },
+  "statStages": {
+    "attack": 0,
+    "defense": 0
+  },
   "energy": 0,
   "energyGain": 0,
-  "statusEffects": [
-    {
-      "type": "buff | debuff | shield | other",
-      "name": "string",
-      "stacks": 0,
-      "duration": 0
-    }
-  ],
   "cooldowns": {
     "fastMoveMs": 0,
     "chargedMoveMs": 0,
@@ -188,9 +187,13 @@ Proposed JSON schema for the per-Pokémon runtime state contract:
 }
 ```
 
-This runtime-state schema is the accepted contract for the next clarification item in the first gap category and will also be mapped into Rust structs during implementation.
+This runtime-state schema is the accepted contract for the first gap category and is mapped to Rust structs.
 
 `combatStats.attack` and `combatStats.defense` are the initialized battle values derived from species base stats, IVs, and the selected level/CP multiplier. They are stored in the snapshot so damage and CMP use the same deterministic values on every turn. These values are before in-battle stat-stage changes and shadow modifiers; those are applied separately during resolution.
+
+`statStages` stores the current attack and defense stages. Each stage is an integer clamped to `-4..=4`, starts at zero, and uses a buff divisor of `4`: positive stages multiply by `(4 + stage) / 4`, while negative stages multiply by `4 / (4 - stage)`. Shadow modifiers apply separately for damage; neither stage nor shadow modifiers affect CMP, which compares initialized attack values.
+
+Move definitions carry optional `buffs` as `[attackDelta, defenseDelta]`, `buffTarget` (`self`, `opponent`, or `both`), and `buffApplyChance` (a probability serialized as a string in the source data). These fields are present together or not at all. For example, Icy Wind uses `[-1, 0]`, targets the opponent, and has chance `"1"`. When a move effect succeeds, the applicable Pokémon's `statStages` are updated. Stage state resets to zero on switch-out; no separate status-effect list is modeled.
 
 The CPM values are stored in `engine/data/cpm.json` in their original order, beginning at level 1.0 with a 0.5-level step. Lookup uses the exact table entry at index `(level - 1.0) / 0.5`; valid levels must fall on a listed half-level. The engine uses direct lookup only and does not interpolate or apply the legacy neighboring-entry derivation.
 
@@ -242,7 +245,7 @@ Proposed JSON schema for the observation payload contract:
 
 ```json
 {
-  "observationVersion": "1.0",
+  "observationVersion": "2.0",
   "turn": 0,
   "self": {
     "participantId": "string",
@@ -252,14 +255,21 @@ Proposed JSON schema for the observation payload contract:
       "currentHp": 100,
       "maxHp": 100,
       "energy": 0,
-      "statusEffects": []
+      "statStages": {
+        "attack": 0,
+        "defense": 0
+      }
     },
     "bench": [
       {
         "slot": 1,
         "species": "string",
         "currentHp": 50,
-        "maxHp": 100
+        "maxHp": 100,
+        "statStages": {
+          "attack": 0,
+          "defense": 0
+        }
       }
     ],
     "shields": 2
@@ -312,7 +322,7 @@ All 1.x versions maintain backward compatibility (additive only). Breaking chang
 **Visibility model for observations:**
 
 SELF SIDE (fully visible):
-- active Pokémon: species, currentHp (raw), maxHp (raw), hpPercentage, energy, statusEffects
+- active Pokémon: species, currentHp (raw), maxHp (raw), hpPercentage, energy, statStages
 - bench: slot, species, currentHp (raw), maxHp (raw), hpPercentage
 - shields remaining count
 - all move identities (fast and charged)
@@ -324,7 +334,7 @@ OPPONENT SIDE (limited visibility):
 - bench count only (not individual Pokémon species)
 - shields remaining count
 - lastUsedMove: the move that resolved in the previous turn (fast or charged)
-- Hidden: opponent energy, opponent move identities (except lastUsedMove), opponent cooldowns (including switchCooldown), opponent in-progress fast move state, opponent status effects
+- Hidden: opponent energy, opponent move identities (except lastUsedMove), opponent cooldowns (including switchCooldown), opponent in-progress fast move state, opponent stat stages
 
 This visibility model mirrors in-game information: players see opponent species and shield count, learn opponent moves after they resolve, track their own cooldowns for informed decisions, and use move history to predict future actions.
 
@@ -423,7 +433,7 @@ It should only receive:
 
 - limited visible team information
 - visible HP/energy information
-- visible statuses and cooldown windows
+- own stat stages and visible cooldown windows
 - known move availability and charging state
 - turn number or phase
 - explicitly permitted opponent information
@@ -670,6 +680,7 @@ The following design decisions have been accepted and are now part of the implem
 - Quick swaps consume a turn.
 - Forced swaps after a faint do not consume a turn.
 - Swap timing remains deterministic and does not depend on network variance.
+- When a Pokémon leaves the active slot and enters the bench, reset `statStages` to zero. Preserve persistent state such as HP and energy.
 
 ### 12.5 Module ownership and API boundaries
 

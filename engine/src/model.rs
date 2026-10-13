@@ -69,14 +69,20 @@ pub struct PokemonState {
     pub current_hp: u32,
     pub max_hp: u32,
     pub combat_stats: CombatStats,
+    #[serde(default)]
+    pub stat_stages: StatStages,
     pub energy: u32,
     #[serde(default)]
     pub pending_energy_gain: u32,
-    #[serde(default)]
-    pub status_effects: Vec<StatusEffect>,
     pub cooldowns: Cooldowns,
     pub move_state: MoveState,
     pub flags: PokemonFlags,
+}
+
+impl PokemonState {
+    pub fn reset_stat_stages_on_switch_out(&mut self) {
+        self.stat_stages = StatStages::default();
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -86,22 +92,76 @@ pub struct CombatStats {
     pub defense: f64,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StatusEffect {
-    pub kind: StatusKind,
-    pub name: String,
-    pub stacks: i32,
-    pub duration: u32,
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", from = "StatStagesInput")]
+pub struct StatStages {
+    attack: i8,
+    defense: i8,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum StatusKind {
-    Buff,
-    Debuff,
-    Shield,
-    Other,
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StatStagesInput {
+    attack: i8,
+    defense: i8,
+}
+
+impl StatStages {
+    pub const MIN: i8 = -4;
+    pub const MAX: i8 = 4;
+    pub const BUFF_DIVISOR: f64 = 4.0;
+
+    pub fn new(attack: i8, defense: i8) -> Self {
+        Self {
+            attack: attack.clamp(Self::MIN, Self::MAX),
+            defense: defense.clamp(Self::MIN, Self::MAX),
+        }
+    }
+
+    pub fn attack_stage(&self) -> i8 {
+        self.attack
+    }
+
+    pub fn defense_stage(&self) -> i8 {
+        self.defense
+    }
+
+    pub fn apply_attack_delta(&mut self, delta: i8) {
+        self.attack = self
+            .attack
+            .saturating_add(delta)
+            .clamp(Self::MIN, Self::MAX);
+    }
+
+    pub fn apply_defense_delta(&mut self, delta: i8) {
+        self.defense = self
+            .defense
+            .saturating_add(delta)
+            .clamp(Self::MIN, Self::MAX);
+    }
+
+    pub fn attack_multiplier(&self) -> f64 {
+        Self::multiplier(self.attack)
+    }
+
+    pub fn defense_multiplier(&self) -> f64 {
+        Self::multiplier(self.defense)
+    }
+
+    fn multiplier(stage: i8) -> f64 {
+        let stage = f64::from(stage.clamp(Self::MIN, Self::MAX));
+        if stage > 0.0 {
+            (Self::BUFF_DIVISOR + stage) / Self::BUFF_DIVISOR
+        } else {
+            Self::BUFF_DIVISOR / (Self::BUFF_DIVISOR - stage)
+        }
+    }
+}
+
+impl From<StatStagesInput> for StatStages {
+    fn from(input: StatStagesInput) -> Self {
+        Self::new(input.attack, input.defense)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -202,7 +262,7 @@ pub struct ObservedPokemon {
     pub max_hp: u32,
     pub hp_percentage: f32,
     pub energy: u32,
-    pub status_effects: Vec<StatusEffect>,
+    pub stat_stages: StatStages,
     pub fast_move: String,
     pub charged_moves: Vec<String>,
 }
@@ -286,7 +346,7 @@ pub struct ParticipantResult {
 
 #[cfg(test)]
 mod tests {
-    use super::{ActionRequest, IndividualValues, PlayerAction, PokemonBuildInput};
+    use super::{ActionRequest, IndividualValues, PlayerAction, PokemonBuildInput, StatStages};
 
     #[test]
     fn action_request_uses_contract_field_names_and_keeps_shields_separate() {
@@ -326,5 +386,32 @@ mod tests {
         assert_eq!(json["level"], 20.5);
         assert_eq!(json["ivs"]["attack"], 10);
         assert_eq!(json["shadow"], false);
+    }
+
+    #[test]
+    fn stat_stages_apply_documented_multipliers_and_clamp_to_four_stages() {
+        let mut stages = StatStages::default();
+        assert_eq!(stages.attack_multiplier(), 1.0);
+        assert_eq!(stages.defense_multiplier(), 1.0);
+
+        stages.apply_attack_delta(6);
+        stages.apply_defense_delta(2);
+        assert_eq!(stages.attack_stage(), 4);
+        assert_eq!(stages.attack_multiplier(), 2.0);
+        assert_eq!(stages.defense_stage(), 2);
+        assert_eq!(stages.defense_multiplier(), 1.5);
+
+        stages.apply_attack_delta(-9);
+        assert_eq!(stages.attack_stage(), -4);
+        assert_eq!(stages.attack_multiplier(), 0.5);
+    }
+
+    #[test]
+    fn deserialized_stat_stages_are_clamped() {
+        let stages: StatStages =
+            serde_json::from_value(serde_json::json!({ "attack": 8, "defense": -10 })).unwrap();
+
+        assert_eq!(stages.attack_stage(), StatStages::MAX);
+        assert_eq!(stages.defense_stage(), StatStages::MIN);
     }
 }
