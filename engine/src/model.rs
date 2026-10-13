@@ -101,6 +101,12 @@ impl PokemonState {
     pub fn reset_stat_stages_on_switch_out(&mut self) {
         self.stat_stages = StatStages::default();
     }
+
+    pub fn cancel_fast_move(&mut self) {
+        self.move_state.fast_move_turns_remaining = 0;
+        self.pending_energy_gain = 0;
+        self.cooldowns.fast_move_ms = 0;
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -194,6 +200,8 @@ pub struct Cooldowns {
 #[serde(rename_all = "camelCase")]
 pub struct MoveState {
     pub fast_move: String,
+    #[serde(default)]
+    pub fast_move_turns_remaining: u32,
     pub charged_moves: Vec<String>,
     pub charged_ready: bool,
     pub pending_charge: bool,
@@ -291,6 +299,7 @@ pub struct ObservedPokemon {
     pub energy: u32,
     pub stat_stages: StatStages,
     pub fast_move: String,
+    pub fast_move_turns_remaining: u32,
     pub charged_moves: Vec<String>,
 }
 
@@ -299,6 +308,7 @@ pub struct ObservedPokemon {
 pub struct OpponentActiveObservation {
     pub species: String,
     pub hp_percentage: f32,
+    pub fast_move_in_progress: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

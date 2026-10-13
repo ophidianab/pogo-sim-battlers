@@ -200,6 +200,7 @@ mod tests {
             },
             move_state: MoveState {
                 fast_move: fast_move.to_owned(),
+                fast_move_turns_remaining: 0,
                 charged_moves: charged_moves.iter().map(|id| (*id).to_owned()).collect(),
                 charged_ready: false,
                 pending_charge: false,

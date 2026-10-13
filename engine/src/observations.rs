@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 
 use crate::model::{
     BattleSnapshot, Observation, ObservedPokemon, OpponentActiveObservation, OpponentObservation,
-    SelfObservation,
+    SelfObservation, TimelineEventKind,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -79,7 +79,10 @@ pub fn build_observation(
             .iter()
             .rev()
             .find(|event| {
-                event.participant_id == opponent.participant_id && event.move_id.is_some()
+                event.participant_id == opponent.participant_id
+                    && event.move_id.is_some()
+                    && (event.kind == TimelineEventKind::TapInteraction
+                        || event.kind == TimelineEventKind::Charged)
             })
             .and_then(|event| event.move_id.clone())
     });
@@ -110,6 +113,8 @@ pub fn build_observation(
             active: OpponentActiveObservation {
                 species: opponent_active.species.clone(),
                 hp_percentage: hp_percentage(opponent_active.current_hp, opponent_active.max_hp),
+                fast_move_in_progress: (opponent_active.move_state.fast_move_turns_remaining > 0)
+                    .then(|| opponent_active.move_state.fast_move.clone()),
             },
             bench_count: opponent.team.len().saturating_sub(1),
             shields: opponent.shields_remaining,
@@ -128,6 +133,7 @@ fn observed_pokemon(pokemon: &crate::model::PokemonState) -> ObservedPokemon {
         energy: pokemon.energy,
         stat_stages: pokemon.stat_stages.clone(),
         fast_move: pokemon.move_state.fast_move.clone(),
+        fast_move_turns_remaining: pokemon.move_state.fast_move_turns_remaining,
         charged_moves: pokemon.move_state.charged_moves.clone(),
     }
 }
@@ -170,6 +176,7 @@ mod tests {
             },
             move_state: MoveState {
                 fast_move: "FAST_MOVE".to_owned(),
+                fast_move_turns_remaining: 0,
                 charged_moves: vec!["CHARGED_MOVE".to_owned()],
                 charged_ready: true,
                 pending_charge: false,
@@ -228,13 +235,18 @@ mod tests {
         battle_state.participants[0].team[0]
             .stat_stages
             .apply_attack_delta(1);
-        let observation = build_observation(&battle_state, "left", "2.1", 1).unwrap();
+        battle_state.participants[0].team[0]
+            .move_state
+            .fast_move_turns_remaining = 2;
+        let observation = build_observation(&battle_state, "left", "2.3", 1).unwrap();
 
         assert_eq!(observation.self_view.active.current_hp, 75);
         assert_eq!(observation.self_view.active.energy, 40);
         assert_eq!(observation.self_view.active.stat_stages.attack_stage(), 1);
+        assert_eq!(observation.self_view.active.fast_move_turns_remaining, 2);
         assert_eq!(observation.opponent.active.species, "Active");
         assert_eq!(observation.opponent.active.hp_percentage, 50.0);
+        assert_eq!(observation.opponent.active.fast_move_in_progress, None);
         assert_eq!(observation.opponent.bench_count, 1);
         assert_eq!(
             observation.opponent.last_used_move.as_deref(),
@@ -244,6 +256,7 @@ mod tests {
         let json = serde_json::to_value(observation).unwrap();
         assert!(json.get("self").is_some());
         assert_eq!(json["self"]["active"]["statStages"]["attack"], 1);
+        assert_eq!(json["self"]["active"]["fastMoveTurnsRemaining"], 2);
         assert!(json["opponent"]["active"].get("currentHp").is_none());
         assert!(json["opponent"].get("energy").is_none());
         assert!(json["opponent"]["active"].get("statStages").is_none());
@@ -251,7 +264,7 @@ mod tests {
 
     #[test]
     fn observation_rejects_unknown_participant() {
-        let error = build_observation(&state(), "missing", "2.1", 1).unwrap_err();
+        let error = build_observation(&state(), "missing", "2.3", 1).unwrap_err();
 
         assert_eq!(error, ObservationError::ParticipantNotFound);
     }
@@ -269,7 +282,7 @@ mod tests {
                 options: vec![1],
             });
 
-        let observation = build_observation(&battle_state, "left", "2.1", 1).unwrap();
+        let observation = build_observation(&battle_state, "left", "2.3", 1).unwrap();
 
         assert_eq!(observation.self_view.active.current_hp, 0);
         assert_eq!(observation.self_view.forced_switch_options.len(), 1);
@@ -277,6 +290,38 @@ mod tests {
         assert_eq!(
             observation.self_view.forced_switch_options[0].species,
             "Bench"
+        );
+    }
+
+    #[test]
+    fn opponent_fast_move_visibility_distinguishes_in_progress_from_resolved() {
+        let mut battle_state = state();
+        let opponent_active = &mut battle_state.participants[1].team[0];
+        opponent_active.move_state.fast_move = "VINE_WHIP".to_owned();
+        opponent_active.move_state.fast_move_turns_remaining = 1;
+        battle_state.timeline[0].events[0].kind = TimelineEventKind::TapInteractionWait;
+        battle_state.timeline[0].events[0].move_id = Some("VINE_WHIP".to_owned());
+        battle_state.timeline[0].events[0].damage = None;
+
+        let in_progress = build_observation(&battle_state, "left", "2.3", 1).unwrap();
+
+        assert_eq!(
+            in_progress.opponent.active.fast_move_in_progress.as_deref(),
+            Some("VINE_WHIP")
+        );
+        assert_eq!(in_progress.opponent.last_used_move, None);
+
+        battle_state.participants[1].team[0]
+            .move_state
+            .fast_move_turns_remaining = 0;
+        battle_state.timeline[0].events[0].kind = TimelineEventKind::TapInteraction;
+        battle_state.timeline[0].events[0].damage = Some(7);
+        let completed = build_observation(&battle_state, "left", "2.3", 1).unwrap();
+
+        assert_eq!(completed.opponent.active.fast_move_in_progress, None);
+        assert_eq!(
+            completed.opponent.last_used_move.as_deref(),
+            Some("VINE_WHIP")
         );
     }
 }

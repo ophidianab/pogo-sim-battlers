@@ -181,6 +181,7 @@ Proposed JSON schema for the per-Pokémon runtime state contract:
   },
   "moveState": {
     "fastMove": "string",
+    "fastMoveTurnsRemaining": 0,
     "chargedMoves": ["string"],
     "chargedReady": false,
     "pendingCharge": false
@@ -251,7 +252,7 @@ Proposed JSON schema for the observation payload contract:
 
 ```json
 {
-  "observationVersion": "2.1",
+  "observationVersion": "2.3",
   "turn": 0,
   "self": {
     "participantId": "string",
@@ -261,6 +262,7 @@ Proposed JSON schema for the observation payload contract:
       "currentHp": 100,
       "maxHp": 100,
       "energy": 0,
+      "fastMoveTurnsRemaining": 0,
       "statStages": {
         "attack": 0,
         "defense": 0
@@ -273,6 +275,7 @@ Proposed JSON schema for the observation payload contract:
         "species": "string",
         "currentHp": 50,
         "maxHp": 100,
+        "fastMoveTurnsRemaining": 0,
         "statStages": {
           "attack": 0,
           "defense": 0
@@ -288,7 +291,8 @@ Proposed JSON schema for the observation payload contract:
       "species": "string",
       "currentHp": 80,
       "maxHp": 100,
-      "energy": 0
+      "energy": 0,
+      "fastMoveInProgress": null
     },
     "benchCount": 2,
     "shields": 1
@@ -329,7 +333,7 @@ All 1.x versions maintain backward compatibility (additive only). Breaking chang
 **Visibility model for observations:**
 
 SELF SIDE (fully visible):
-- active Pokémon: species, currentHp (raw), maxHp (raw), hpPercentage, energy, statStages
+- active Pokémon: species, currentHp (raw), maxHp (raw), hpPercentage, energy, statStages, fastMoveTurnsRemaining
 - bench: slot, species, currentHp (raw), maxHp (raw), hpPercentage
 - shields remaining count
 - all move identities (fast and charged)
@@ -337,11 +341,11 @@ SELF SIDE (fully visible):
 - switchCooldown: turns remaining before voluntary swap is available (0 = can swap now)
 
 OPPONENT SIDE (limited visibility):
-- active Pokémon: species, hpPercentage only (no raw HP values)
+- active Pokémon: species, hpPercentage only (no raw HP values), plus the fast-move identity while its animation is in progress
 - bench count only (not individual Pokémon species)
 - shields remaining count
-- lastUsedMove: the move that resolved in the previous turn (fast or charged)
-- Hidden: opponent energy, opponent move identities (except lastUsedMove), opponent cooldowns (including switchCooldown), opponent in-progress fast move state, opponent stat stages
+- lastUsedMove: the most recent move that resolved (fast or charged); in-progress fast moves are not reported here
+- Hidden: opponent energy, charged-move identities, other unused move choices, cooldowns (including switchCooldown), exact fast-move turns remaining, and stat stages
 
 This visibility model mirrors in-game information: players see opponent species and shield count, learn opponent moves after they resolve, track their own cooldowns for informed decisions, and use move history to predict future actions.
 
@@ -642,8 +646,10 @@ For each charged move in CMP order:
 
 For fast moves in queue:
 - Only queue damage if source is NOT fainted (killed by opponent's charged move)
-- Start or continue fast move duration (1+ turns)
-- Queued damage applies at end-of-turn
+- Track remaining duration in `fastMoveTurnsRemaining` (one turn is 500 ms)
+- While turns remain, lock that participant's action and record `tap interaction wait`
+- On completion, apply damage and energy gain at end-of-turn
+- If a charged move resolves while the opponent's fast move is in progress, force it to complete after charged damage; cancel it if its user faints
 
 ### 13.6 End-of-turn resolution
 
