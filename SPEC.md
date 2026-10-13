@@ -150,7 +150,7 @@ Within a turn, actions execute in this order:
 
 When multiple participants use charged moves on the same turn:
 - The participant with the higher attack stat has their charged move resolve first
-- If attack stats are equal, left-to-right participant ordering breaks the tie
+- If attack stats are equal, a 50/50 coin flip determines which charged move resolves first; consume one draw from the deterministic battle RNG state
 - **Cascade consequence**: if a charged move resolves first and causes the target to faint, the target's queued charged move does not fire, and any in-progress fast move is cancelled
 
 #### Charged move resolution with shield decision
@@ -184,6 +184,7 @@ These rules ensure the following:
 - **CMP controls charged move ordering**: higher attack stat moves resolve first; if fatal, the opponent's charged move is cancelled
 - **Forced-swap options are deterministic**: the living bench options are recorded in roster order; the trainer chooses when multiple options remain, while a sole option is selected automatically
 - **Chance-based move effects are deterministic**: the snapshot RNG state advances in a documented order, so fixed initial state and actions produce identical effect outcomes
+- **Voluntary switch cooldown**: a voluntary swap starts a 45-second cooldown; at 500 ms per turn, 90 turns must elapse before another voluntary swap is legal. The swap's own turn advances this timer; forced replacements do not start or reset it.
 
 These rules remain the basis for correctness, even as the number of participants grows from 2 to N.
 

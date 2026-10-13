@@ -102,6 +102,8 @@ Each `pendingForcedSwaps` entry contains the participant ID and the eligible ben
 
 Each `pendingChargedMoves` entry contains the participant ID and selected move ID. A charged action spends its energy when queued, resolves at the start of the following turn before fast-move damage, and occupies that participant's action slot for that turn. The pending entry is cleared after resolution or if its user faints first.
 
+While a charged move is pending, `cooldowns.chargedMoveMs` mirrors the 500 ms queued-turn lock and clears on resolution or cancellation; there is no additional post-resolution charged cooldown.
+
 Battle initialization accepts a build input for each Pokémon. The caller supplies species, level, IVs, and shadow status; the initializer derives HP and effective combat stats once and stores the resulting values in the battle snapshot.
 
 ```json
@@ -628,7 +630,7 @@ Shield decisions are **not** collected at turn start. Instead, they are requeste
 
 Execute actions in this priority order:
 1. **Swaps** (all swaps execute first, no damage yet)
-2. **Charged moves** (ordered by CMP: higher attack stat goes first; ties broken left-to-right by participant)
+2. **Charged moves** (ordered by CMP: higher attack stat goes first; equal attack uses a seeded 50/50 coin flip)
 3. **Fast moves** (all queued for damage application at end-of-turn)
 
 ### 13.4 Charged move resolution with CMP cascade and shield decision
@@ -669,9 +671,9 @@ For fast moves in queue:
 
 - **Simultaneous KOs are possible**: both participants can faint on the same turn if both survive charged moves and their fast moves both apply damage
 - **Energy cannot be spent in the turn it is gained**: end-of-turn energy gain becomes available starting next turn
-- **CMP controls charged move ordering**: higher attack stat charged move resolves first; if it kills, opponent's charged move does not fire
+- **CMP controls charged move ordering**: higher attack stat charged move resolves first; equal attack uses one deterministic RNG draw for a 50/50 winner; if the first move faints its target, the target's queued charged move does not fire
 - **Forced completion of in-progress fast moves**: when opponent uses charged move, any in-progress fast move completes immediately (but only applies damage if attacker survives the charged move)
-- **Left-to-right tiebreaker**: for actions of the same type with equal priority, participant-0 (left side) executes before participant-1 (right side)
+- **Temporary implementation deviation**: the current MVP resolves equal-attack charged CMP left-first; replace this with the specified seeded coin flip. Other equal-priority action ordering remains left-to-right.
 - **Forced replacement choice**: candidate slots are emitted in roster order; the trainer chooses among multiple living candidates without consuming a turn, and the sole living candidate is selected automatically
 
 ### 13.8 Timeline events
@@ -710,7 +712,9 @@ The following design decisions have been accepted and are now part of the implem
 
 - Swaps resolve before damage.
 - Quick swaps consume a turn.
+- A voluntary swap starts a 45-second switch cooldown (90 turns at 500 ms per turn); the swap's own turn counts toward the cooldown.
 - Forced swaps after a faint do not consume a turn.
+- Forced swaps do not start or reset the voluntary switch cooldown.
 - If multiple living bench Pokémon remain after a faint, the trainer chooses the replacement; if exactly one remains, select it automatically.
 - Pending forced-switch choices are snapshot state and are exposed to that participant as `forcedSwitchOptions` until a valid slot is selected.
 - Swap timing remains deterministic and does not depend on network variance.
