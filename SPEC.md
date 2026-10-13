@@ -161,7 +161,7 @@ When a charged move is being applied to a target:
 2. Calculate base damage
 3. If defender chose to shield, reduce damage to 1 and consume one shield
 4. Apply final damage to defender
-5. Apply stat changes and buffs/debuffs
+5. Roll the move's configured effect chance from the deterministic snapshot RNG state and apply stat-stage changes to its configured target; shielding does not suppress the effect
 6. Check for faint and cascade
 
 #### End-of-turn resolution
@@ -183,6 +183,7 @@ These rules ensure the following:
 - **Swaps resolve before damage**: swap timing is deterministic and cannot be affected by incoming damage
 - **CMP controls charged move ordering**: higher attack stat moves resolve first; if fatal, the opponent's charged move is cancelled
 - **Forced-swap options are deterministic**: the living bench options are recorded in roster order; the trainer chooses when multiple options remain, while a sole option is selected automatically
+- **Chance-based move effects are deterministic**: the snapshot RNG state advances in a documented order, so fixed initial state and actions produce identical effect outcomes
 
 These rules remain the basis for correctness, even as the number of participants grows from 2 to N.
 

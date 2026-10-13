@@ -217,6 +217,7 @@ mod tests {
         BattleSnapshot {
             battle_id: "battle-1".to_owned(),
             turn: 4,
+            rng_state: 0,
             participants: vec![ParticipantState {
                 participant_id: "left".to_owned(),
                 controller_type: ControllerType::Scripted,

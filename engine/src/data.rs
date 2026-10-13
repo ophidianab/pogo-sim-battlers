@@ -22,6 +22,10 @@ pub struct MoveDefinition {
     pub buffs: Option<[i8; 2]>,
     #[serde(default)]
     pub buff_target: Option<BuffTarget>,
+    #[serde(default)]
+    pub buffs_self: Option<[i8; 2]>,
+    #[serde(default)]
+    pub buffs_opponent: Option<[i8; 2]>,
     #[serde(default, deserialize_with = "deserialize_buff_apply_chance")]
     pub buff_apply_chance: Option<f64>,
 }
@@ -356,6 +360,16 @@ fn validate_move_buffs<'a>(
                 move_definition.move_id
             )));
         }
+        let has_self_buffs = move_definition.buffs_self.is_some();
+        let has_opponent_buffs = move_definition.buffs_opponent.is_some();
+        if has_self_buffs != has_opponent_buffs
+            || (has_self_buffs && move_definition.buff_target != Some(BuffTarget::Both))
+        {
+            return Err(DataCatalogError(format!(
+                "move {} must provide buffsSelf and buffsOpponent together with buffTarget both",
+                move_definition.move_id
+            )));
+        }
     }
     Ok(())
 }
@@ -424,6 +438,10 @@ mod tests {
         assert_eq!(icy_wind.buffs, Some([-1, 0]));
         assert_eq!(icy_wind.buff_target, Some(BuffTarget::Opponent));
         assert_eq!(icy_wind.buff_apply_chance, Some(1.0));
+
+        let obstruct = catalog.move_definition("OBSTRUCT").unwrap();
+        assert_eq!(obstruct.buffs_self, Some([0, 1]));
+        assert_eq!(obstruct.buffs_opponent, Some([0, -1]));
 
         let bulbasaur = catalog.pokemon_definition("bulbasaur").unwrap();
         assert_eq!(bulbasaur.base_stats.atk, 118);
@@ -554,6 +572,22 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "move PARTIAL must provide buffs, buffTarget, and buffApplyChance together"
+        );
+    }
+
+    #[test]
+    fn self_and_opponent_buff_deltas_must_be_paired_for_both_target_moves() {
+        let moves = r#"[
+            {"moveId":"PARTIAL","name":"Partial","type":"normal","power":1,"energy":1,"energyGain":0,"cooldown":500,"turns":1,"buffs":[0,1],"buffsSelf":[0,1],"buffTarget":"both","buffApplyChance":"1"}
+        ]"#;
+        let cpm = r#"{"startingLevel":1.0,"levelStep":0.5,"values":[0.1]}"#;
+        let type_chart = include_str!("../data/type_chart.json");
+
+        let error = DataCatalog::from_json(moves, "[]", cpm, type_chart).unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "move PARTIAL must provide buffsSelf and buffsOpponent together with buffTarget both"
         );
     }
 }

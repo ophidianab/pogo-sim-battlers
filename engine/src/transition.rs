@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 
 use crate::actions::normalize_actions;
 use crate::damage::{DamageCombatant, calculate_damage};
-use crate::data::DataCatalog;
+use crate::data::{BuffTarget, DataCatalog, MoveDefinition};
 use crate::model::{
     ActionRequest, BattleSnapshot, PendingChargedMove, PendingForcedSwap, PlayerAction,
     ShieldDecision, ShieldDecisionRequest, TimelineEvent, TimelineEventKind, TurnRecord,
@@ -118,6 +118,7 @@ pub fn resolve_turn_with_shield_decisions(
             move_id: None,
             damage: None,
             shielded: None,
+            buff_applied: None,
             duration_ms: None,
             species: Some(species),
         });
@@ -228,6 +229,15 @@ pub fn resolve_turn_with_shield_decisions(
             next_snapshot.participants[target_index].shields_remaining -= 1;
         }
         let applied_damage = if shielded { 1 } else { damage };
+        let target = active_pokemon_mut(&mut next_snapshot, target_index)?;
+        let fainted = target.current_hp > 0 && target.current_hp <= applied_damage;
+        target.current_hp = target.current_hp.saturating_sub(applied_damage);
+        let buff_applied = apply_charged_move_effect(
+            &mut next_snapshot,
+            move_definition,
+            attacker_index,
+            target_index,
+        );
         timeline_entries.push(TimelineEvent {
             kind: TimelineEventKind::Charged,
             participant_id: next_snapshot.participants[attacker_index]
@@ -237,14 +247,13 @@ pub fn resolve_turn_with_shield_decisions(
             move_id: Some(move_id.clone()),
             damage: Some(applied_damage),
             shielded: Some(shielded),
+            buff_applied,
             duration_ms: Some(move_definition.cooldown),
             species: None,
         });
 
-        let target = active_pokemon_mut(&mut next_snapshot, target_index)?;
-        let fainted = target.current_hp > 0 && target.current_hp <= applied_damage;
-        target.current_hp = target.current_hp.saturating_sub(applied_damage);
         if fainted {
+            let target = active_pokemon_mut(&mut next_snapshot, target_index)?;
             target.flags.fainted = true;
             fainted_participants.push(target_index);
             target.is_active = false;
@@ -373,6 +382,7 @@ pub fn resolve_turn_with_shield_decisions(
                     move_id: Some(move_id),
                     damage: Some(damage),
                     shielded: None,
+                    buff_applied: None,
                     duration_ms: Some(move_definition.cooldown),
                     species: None,
                 },
@@ -391,6 +401,7 @@ pub fn resolve_turn_with_shield_decisions(
                 move_id: Some(move_id),
                 damage: None,
                 shielded: None,
+                buff_applied: None,
                 duration_ms: Some(500),
                 species: None,
             });
@@ -460,6 +471,7 @@ pub fn resolve_turn_with_shield_decisions(
             move_id: None,
             damage: None,
             shielded: None,
+            buff_applied: None,
             duration_ms: None,
             species: Some(fainted_species),
         });
@@ -484,6 +496,7 @@ pub fn resolve_turn_with_shield_decisions(
                 move_id: None,
                 damage: None,
                 shielded: None,
+                buff_applied: None,
                 duration_ms: None,
                 species: Some(species),
             });
@@ -547,6 +560,71 @@ fn calculate_active_move_damage(
     .map_err(|error| TransitionError::Damage(error.to_string()))
 }
 
+fn apply_charged_move_effect(
+    snapshot: &mut BattleSnapshot,
+    move_definition: &MoveDefinition,
+    attacker_index: usize,
+    target_index: usize,
+) -> Option<bool> {
+    let buffs = move_definition.buffs?;
+    let buff_target = move_definition.buff_target?;
+    let chance = move_definition.buff_apply_chance?;
+    if !roll_chance(&mut snapshot.rng_state, chance) {
+        return Some(false);
+    }
+    let self_buffs = move_definition.buffs_self.unwrap_or(buffs);
+    let opponent_buffs = move_definition.buffs_opponent.unwrap_or(buffs);
+
+    match buff_target {
+        BuffTarget::SelfOnly => {
+            apply_stat_stage_deltas_to_active(snapshot, attacker_index, self_buffs)
+        }
+        BuffTarget::Opponent => {
+            apply_stat_stage_deltas_to_active(snapshot, target_index, opponent_buffs)
+        }
+        BuffTarget::Both => {
+            apply_stat_stage_deltas_to_active(snapshot, attacker_index, self_buffs);
+            apply_stat_stage_deltas_to_active(snapshot, target_index, opponent_buffs);
+        }
+    }
+    Some(true)
+}
+
+fn apply_stat_stage_deltas_to_active(
+    snapshot: &mut BattleSnapshot,
+    participant_index: usize,
+    deltas: [i8; 2],
+) {
+    let active_index = snapshot.participants[participant_index].active_pokemon_index;
+    apply_stat_stage_deltas(
+        &mut snapshot.participants[participant_index].team[active_index],
+        deltas,
+    );
+}
+
+fn apply_stat_stage_deltas(pokemon: &mut crate::model::PokemonState, deltas: [i8; 2]) {
+    pokemon.stat_stages.apply_attack_delta(deltas[0]);
+    pokemon.stat_stages.apply_defense_delta(deltas[1]);
+}
+
+fn roll_chance(rng_state: &mut u64, chance: f64) -> bool {
+    if chance <= 0.0 {
+        return false;
+    }
+    if chance >= 1.0 {
+        return true;
+    }
+
+    *rng_state = rng_state.wrapping_add(0x9e37_79b9_7f4a_7c15);
+    let mut value = *rng_state;
+    value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    value ^= value >> 31;
+
+    let sample = (value >> 11) as f64 / (1_u64 << 53) as f64;
+    sample < chance
+}
+
 fn resolve_pending_forced_swaps(
     snapshot: &BattleSnapshot,
     requests: &[ActionRequest],
@@ -604,6 +682,7 @@ fn resolve_pending_forced_swaps(
             move_id: None,
             damage: None,
             shielded: None,
+            buff_applied: None,
             duration_ms: None,
             species: Some(species),
         });
@@ -734,6 +813,7 @@ mod tests {
         BattleSnapshot {
             battle_id: "fixed-1v1".to_owned(),
             turn: 4,
+            rng_state: 0,
             participants: vec![
                 participant("left", Side::Left, "bulbasaur"),
                 participant("right", Side::Right, "squirtle"),
@@ -1129,6 +1209,7 @@ mod tests {
         assert_eq!(shielded_event.kind, TimelineEventKind::Charged);
         assert_eq!(shielded_event.damage, Some(1));
         assert_eq!(shielded_event.shielded, Some(true));
+        assert_eq!(shielded_event.buff_applied, None);
         assert_eq!(shielded_next.timeline[1].events.len(), 1);
         assert!(
             !shielded_next.participants[0].team[0]
@@ -1158,6 +1239,198 @@ mod tests {
                 .events
                 .iter()
                 .all(|event| event.kind != TimelineEventKind::TapInteraction)
+        );
+    }
+
+    #[test]
+    fn shielded_icy_wind_still_applies_its_guaranteed_opponent_debuff() {
+        let mut state = snapshot();
+        let catalog = DataCatalog::embedded().unwrap();
+        let energy_cost = catalog.charged_move_cost("ICY_WIND").unwrap();
+        let attacker = &mut state.participants[0].team[0];
+        attacker.energy = energy_cost;
+        attacker
+            .move_state
+            .charged_moves
+            .push("ICY_WIND".to_owned());
+        state.participants[1].shields_remaining = 1;
+        let queue_actions = [
+            ActionRequest {
+                participant_id: "left".to_owned(),
+                turn: 4,
+                action: PlayerAction::ChargedMove {
+                    move_id: "ICY_WIND".to_owned(),
+                },
+            },
+            ActionRequest {
+                participant_id: "right".to_owned(),
+                turn: 4,
+                action: PlayerAction::Wait,
+            },
+        ];
+        let queued = resolve_turn(&state, &queue_actions, &catalog).unwrap();
+        let queued_state = queued.next_snapshot;
+        let resolve_actions = [
+            ActionRequest {
+                participant_id: "left".to_owned(),
+                turn: 5,
+                action: PlayerAction::Wait,
+            },
+            ActionRequest {
+                participant_id: "right".to_owned(),
+                turn: 5,
+                action: PlayerAction::Wait,
+            },
+        ];
+        let shield_decisions = [ShieldDecisionRequest {
+            participant_id: "right".to_owned(),
+            turn: 5,
+            decision: ShieldDecision::Shield,
+        }];
+
+        let transition = resolve_turn_with_shield_decisions(
+            &queued_state,
+            &resolve_actions,
+            &shield_decisions,
+            &catalog,
+        )
+        .unwrap();
+        let next = transition.next_snapshot;
+        let event = &next.timeline[1].events[0];
+
+        assert_eq!(next.participants[1].team[0].current_hp, 99);
+        assert_eq!(next.participants[1].shields_remaining, 0);
+        assert_eq!(next.participants[1].team[0].stat_stages.attack_stage(), -1);
+        assert_eq!(next.participants[1].team[0].stat_stages.defense_stage(), 0);
+        assert_eq!(event.shielded, Some(true));
+        assert_eq!(event.buff_applied, Some(true));
+        assert_eq!(next.rng_state, queued_state.rng_state);
+    }
+
+    #[test]
+    fn obstruct_applies_distinct_buff_deltas_to_both_participants() {
+        let mut state = snapshot();
+        let catalog = DataCatalog::embedded().unwrap();
+        let energy_cost = catalog.charged_move_cost("OBSTRUCT").unwrap();
+        let attacker = &mut state.participants[0].team[0];
+        attacker.energy = energy_cost;
+        attacker
+            .move_state
+            .charged_moves
+            .push("OBSTRUCT".to_owned());
+        let queue_actions = [
+            ActionRequest {
+                participant_id: "left".to_owned(),
+                turn: 4,
+                action: PlayerAction::ChargedMove {
+                    move_id: "OBSTRUCT".to_owned(),
+                },
+            },
+            ActionRequest {
+                participant_id: "right".to_owned(),
+                turn: 4,
+                action: PlayerAction::Wait,
+            },
+        ];
+        let queued = resolve_turn(&state, &queue_actions, &catalog).unwrap();
+        let queued_state = queued.next_snapshot;
+        let resolve_actions = [
+            ActionRequest {
+                participant_id: "left".to_owned(),
+                turn: 5,
+                action: PlayerAction::Wait,
+            },
+            ActionRequest {
+                participant_id: "right".to_owned(),
+                turn: 5,
+                action: PlayerAction::Wait,
+            },
+        ];
+
+        let transition = resolve_turn(&queued_state, &resolve_actions, &catalog).unwrap();
+        let next = transition.next_snapshot;
+        let event = &next.timeline[1].events[0];
+
+        assert_eq!(next.participants[0].team[0].stat_stages.defense_stage(), 1);
+        assert_eq!(next.participants[1].team[0].stat_stages.defense_stage(), -1);
+        assert_eq!(event.buff_applied, Some(true));
+        assert_eq!(next.rng_state, queued_state.rng_state);
+    }
+
+    #[test]
+    fn chance_based_charged_effects_are_reproducible_from_snapshot_rng_state() {
+        let mut state = snapshot();
+        let catalog = DataCatalog::embedded().unwrap();
+        let energy_cost = catalog.charged_move_cost("AEROBLAST").unwrap();
+        let attacker = &mut state.participants[0].team[0];
+        attacker.energy = energy_cost;
+        attacker
+            .move_state
+            .charged_moves
+            .push("AEROBLAST".to_owned());
+        state.participants[1].shields_remaining = 1;
+        state.rng_state = 42;
+        let queue_actions = [
+            ActionRequest {
+                participant_id: "left".to_owned(),
+                turn: 4,
+                action: PlayerAction::ChargedMove {
+                    move_id: "AEROBLAST".to_owned(),
+                },
+            },
+            ActionRequest {
+                participant_id: "right".to_owned(),
+                turn: 4,
+                action: PlayerAction::Wait,
+            },
+        ];
+        let queued = resolve_turn(&state, &queue_actions, &catalog).unwrap();
+        let queued_state = queued.next_snapshot;
+        let resolve_actions = [
+            ActionRequest {
+                participant_id: "left".to_owned(),
+                turn: 5,
+                action: PlayerAction::Wait,
+            },
+            ActionRequest {
+                participant_id: "right".to_owned(),
+                turn: 5,
+                action: PlayerAction::Wait,
+            },
+        ];
+        let shield_decisions = [ShieldDecisionRequest {
+            participant_id: "right".to_owned(),
+            turn: 5,
+            decision: ShieldDecision::Shield,
+        }];
+
+        let first = resolve_turn_with_shield_decisions(
+            &queued_state,
+            &resolve_actions,
+            &shield_decisions,
+            &catalog,
+        )
+        .unwrap();
+        let second = resolve_turn_with_shield_decisions(
+            &queued_state,
+            &resolve_actions,
+            &shield_decisions,
+            &catalog,
+        )
+        .unwrap();
+        let next = first.next_snapshot;
+        let event = &next.timeline[1].events[0];
+
+        assert_eq!(next, second.next_snapshot);
+        assert_eq!(event.buff_applied.is_some(), true);
+        assert_ne!(next.rng_state, queued_state.rng_state);
+        assert_eq!(
+            next.participants[0].team[0].stat_stages.attack_stage(),
+            if event.buff_applied == Some(true) {
+                2
+            } else {
+                0
+            }
         );
     }
 

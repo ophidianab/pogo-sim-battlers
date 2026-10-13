@@ -110,6 +110,8 @@ mod tests {
             turns: 1,
             buffs: None,
             buff_target: None,
+            buffs_self: None,
+            buffs_opponent: None,
             buff_apply_chance: None,
         }
     }

@@ -44,6 +44,7 @@ Implement the first milestone: a deterministic 1v1 battle engine that uses immut
 ### Tasks
 - Implement action ordering: swaps, charged moves, fast moves.
 - Implement fast-move duration tracking, completion timing, and action locks.
+- Implement charged-move stat effects and deterministic chance rolls.
 - Implement end-of-turn damage resolution.
 - Implement energy gain timing and same-turn spending rules.
 - Implement shield resolution and fallback behavior.
@@ -75,6 +76,7 @@ Implement the first milestone: a deterministic 1v1 battle engine that uses immut
 
 ### Tasks
 - Add unit tests for move timing and shield logic.
+- Add tests for guaranteed, shielded, chance-based, and distinct both-target charged-move effects.
 - Add tests for multi-turn fast-move duration, action locks, charged completion, and faint cancellation.
 - Add tests for swap-before-damage semantics.
 - Add tests for sole-candidate auto-switch and trainer-selected replacement when multiple bench Pokémon remain.

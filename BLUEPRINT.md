@@ -85,6 +85,7 @@ Initial JSON-style shape for the snapshot root:
 {
   "battleId": "string",
   "turn": 0,
+  "rngState": 0,
   "participants": [],
   "pendingChargedMoves": [],
   "pendingForcedSwaps": [],
@@ -94,6 +95,8 @@ Initial JSON-style shape for the snapshot root:
 ```
 
 The `participants` array will contain ordered participant entries with per-side roster and active-slot information, and the implementation will later map this contract into Rust structs.
+
+`rngState` is the persisted 64-bit SplitMix64 state used for probabilistic battle effects. A new battle may set it to its chosen seed; omitted values default to zero. It advances once for each effect roll whose probability is strictly between zero and one; guaranteed and impossible effects consume no draw.
 
 Each `pendingForcedSwaps` entry contains the participant ID and the eligible bench slot IDs in roster order. It is empty unless a faint leaves that participant with multiple living replacements to choose from; a sole replacement is selected automatically.
 
@@ -200,7 +203,7 @@ This runtime-state schema is the accepted contract for the first gap category an
 
 `statStages` stores the current attack and defense stages. Each stage is an integer clamped to `-4..=4`, starts at zero, and uses a buff divisor of `4`: positive stages multiply by `(4 + stage) / 4`, while negative stages multiply by `4 / (4 - stage)`. Shadow modifiers apply separately for damage; neither stage nor shadow modifiers affect CMP, which compares initialized attack values.
 
-Move definitions carry optional `buffs` as `[attackDelta, defenseDelta]`, `buffTarget` (`self`, `opponent`, or `both`), and `buffApplyChance` (a probability serialized as a string in the source data). These fields are present together or not at all. For example, Icy Wind uses `[-1, 0]`, targets the opponent, and has chance `"1"`. When a move effect succeeds, the applicable Pokémon's `statStages` are updated. Stage state resets to zero on switch-out; no separate status-effect list is modeled.
+Move definitions carry optional `buffs` as `[attackDelta, defenseDelta]`, `buffTarget` (`self`, `opponent`, or `both`), and `buffApplyChance` (a probability serialized as a string in the source data). These fields are present together or not at all. Moves targeting both Pokémon may provide `buffsSelf` and `buffsOpponent` to specify distinct deltas; otherwise `buffs` applies to both. Icy Wind uses `[-1, 0]` against the opponent at chance `"1"`; Obstruct raises the user's defense and lowers the opponent's defense. Successful effects update `statStages`, clamped to `-4..=4`. Stage state resets to zero on switch-out; no separate status-effect list is modeled.
 
 The CPM values are stored in `engine/data/cpm.json` in their original order, beginning at level 1.0 with a 0.5-level step. Lookup uses the exact table entry at index `(level - 1.0) / 0.5`; valid levels must fall on a listed half-level. The engine uses direct lookup only and does not interpolate or apply the legacy neighboring-entry derivation.
 
@@ -235,8 +238,7 @@ Proposed JSON schema for the normalized action contract:
       "moveId": "string"
     },
     "chargedMove": {
-      "moveId": "string",
-      "shield": false
+      "moveId": "string"
     },
     "swap": {
       "targetSlot": 1
@@ -384,7 +386,8 @@ Proposed JSON schema for the battle result payload contract:
           "participantId": "string",
           "moveId": "string",
           "damage": 35,
-          "shielded": false
+          "shielded": false,
+          "buffApplied": true
         },
         {
           "type": "switchAvailable",
@@ -636,7 +639,8 @@ For each charged move in CMP order:
 - Calculate base damage
 - Apply shield if defender chose to shield (reduces damage to 1, consumes one shield)
 - Apply damage to defender
-- Apply stat changes and buffs/debuffs
+- Roll `buffApplyChance` from the snapshot RNG state and apply `buffs` to the configured target; shield mitigation does not suppress effects
+- Record `buffApplied` on the charged timeline event when the move has an effect
 - **Cascade check**: if defender faints:
   - Cancel defender's in-progress fast move (damage never applies)
   - Cancel defender's queued charged move (does not fire)

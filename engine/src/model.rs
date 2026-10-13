@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 pub struct BattleSnapshot {
     pub battle_id: String,
     pub turn: u32,
+    #[serde(default)]
+    pub rng_state: u64,
     pub participants: Vec<ParticipantState>,
     #[serde(default)]
     pub pending_charged_moves: Vec<PendingChargedMove>,
@@ -332,6 +334,8 @@ pub struct TimelineEvent {
     pub damage: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shielded: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buff_applied: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub duration_ms: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -205,6 +205,7 @@ mod tests {
         BattleSnapshot {
             battle_id: "battle-1".to_owned(),
             turn: 8,
+            rng_state: 0,
             participants: vec![
                 participant("left", Side::Left, 75),
                 participant("right", Side::Right, 50),
@@ -221,6 +222,7 @@ mod tests {
                     move_id: Some("LAST_CHARGED_MOVE".to_owned()),
                     damage: Some(20),
                     shielded: Some(false),
+                    buff_applied: None,
                     duration_ms: None,
                     species: None,
                 }],
