@@ -37,10 +37,11 @@ The main design gaps have been closed. The project now has an accepted architect
 
 ### 4. State history and replayability
 
-- [x] Resolved the replay model as snapshot-plus-event log.
+- [x] Resolved replay recording as an optional observer concern outside the battle runner.
 - [x] Defined the event taxonomy and accepted event names.
 - [x] Defined how timeline entries are emitted and ordered.
-- [x] Defined serialization/export rules for debugging and replay.
+- [x] Defined a versioned replay artifact containing the seeded initial snapshot and each transition's inputs and events once.
+- [x] Defined compatible rules/data-catalog revision requirements and non-duplicating checkpoint semantics.
 
 ### 5. Compatibility mapping to pvpoke runtime behavior
 
@@ -55,8 +56,9 @@ The main design gaps have been closed. The project now has an accepted architect
 - [x] Defined the engine module layout.
 - [x] Defined module ownership and responsibilities for battle state.
 - [x] Defined module boundaries for player-facing interfaces.
+- [x] Defined transition-observer and external replay-recorder ownership boundaries.
 - [x] Defined the TUI boundary as separate from engine logic.
-- [x] Defined serialization/export boundaries for replay and analysis.
+- [x] Defined serialization/export boundaries that avoid retaining full timeline-bearing snapshots per transition.
 
 ### 7. Validation and acceptance criteria
 
@@ -73,7 +75,7 @@ These are no longer unresolved specification gaps; they are implementation follo
 - [x] Initial milestone team shape and scaling assumptions are documented.
 - [x] The engine is modeled as an immutable snapshot transition system with explicit event logging.
 - [x] TUI launch and verification use are documented as a debugging layer.
-- [x] Serialization format is defined as snapshot-plus-event log for replay and debugging.
+- [x] Serialization format is defined as an initial snapshot plus an ordered, single-copy transition input/event log for replay and debugging.
 - [x] Unsupported future action types are handled via normalization or rejection with deterministic fallback.
 
 ## Current Status

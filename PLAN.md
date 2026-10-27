@@ -64,14 +64,18 @@ Implement the first milestone: a deterministic 1v1 battle engine that uses immut
 
 ### Tasks
 - Emit structured timeline events for each turn.
-- Serialize snapshots and event logs for replay/debugging.
+- Emit immutable transition notifications to optional observers after every successful transition, including no-turn forced-switch continuations; include action requests, shield decisions, emitted events, and read-only before/after snapshots.
+- Implement an external replay recorder that stores the initial snapshot and each transition's inputs and events once; do not retain a full timeline-bearing snapshot for every step.
+- Serialize a versioned replay artifact with the initial RNG state and the rules/data-catalog revision required to reproduce the battle.
+- Replay the recorded inputs and verify the resulting event sequence; support optional checkpoints without duplicating prior history.
 - Build the battle result payload.
 - Include winner/loser, total turns, duration, and per-side result metadata.
 
 ### Acceptance criteria
 - The battle result includes the required timeline and summary fields.
 - Event ordering is deterministic and reconstructs the battle state.
-- Replay output can be inspected without depending on engine internals.
+- Replay recording is optional and does not make the battle runner retain history.
+- A replay can be verified with a compatible rules/data-catalog revision without depending on engine internals.
 
 ## Phase 5: Validation and regression tests
 
@@ -83,7 +87,8 @@ Implement the first milestone: a deterministic 1v1 battle engine that uses immut
 - Add tests for sole-candidate auto-switch and trainer-selected replacement when multiple bench Pokémon remain.
 - Add tests for energy timing and same-turn spending rules.
 - Add tests for equal-CMP coin-flip outcomes and replay, simultaneous fast-move knockouts, both participants locked in fast moves, and switch cooldown expiry.
-- Add replay fidelity tests.
+- Test that transition observers receive successful turn and no-turn transitions once, including selector-generated action requests, and are not notified for failed transitions.
+- Test compact replay serialization round-trips, reproduces the recorded event stream from the initial RNG state, and rejects incompatible rules/data-catalog revisions or mismatched events.
 - Add observation contract validation tests.
 
 ### Acceptance criteria
