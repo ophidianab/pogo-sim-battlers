@@ -6,10 +6,9 @@ use crate::data::{DataCatalog, StatInitializationError};
 use crate::model::{
     ActionRequest, BattleSnapshot, CombatStats, ControllerType, Cooldowns, MoveState, Observation,
     ParticipantState, PlayerAction, PokemonBuildInput, PokemonFlags, PokemonState,
-    ShieldDecisionRequest, Side, StatStages,
+    ShieldDecisionRequest, Side, StatStages, TimelineEvent,
 };
 use crate::observations::{ObservationError, build_observation};
-use crate::replay::{BattleReplay, ReplayStep};
 use crate::transition::{TransitionError, TurnTransition, resolve_turn_with_shield_decisions};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -33,6 +32,30 @@ pub struct PokemonSetup {
     pub build: PokemonBuildInput,
     pub fast_move: String,
     pub charged_moves: Vec<String>,
+}
+
+pub struct TransitionObservation<'a> {
+    pub sequence_index: u64,
+    pub turn_before: u32,
+    pub turn_after: u32,
+    pub action_requests: &'a [ActionRequest],
+    pub shield_decisions: &'a [ShieldDecisionRequest],
+    pub events: &'a [TimelineEvent],
+    pub before_snapshot: &'a BattleSnapshot,
+    pub after_snapshot: &'a BattleSnapshot,
+}
+
+pub trait TransitionObserver {
+    fn on_transition(&mut self, observation: TransitionObservation<'_>);
+}
+
+impl<F> TransitionObserver for F
+where
+    F: for<'a> FnMut(TransitionObservation<'a>),
+{
+    fn on_transition(&mut self, observation: TransitionObservation<'_>) {
+        self(observation);
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -282,9 +305,8 @@ impl From<TransitionError> for BattleRunnerError {
 }
 
 pub struct BattleRunner<'catalog> {
-    initial_snapshot: BattleSnapshot,
     snapshot: BattleSnapshot,
-    replay_steps: Vec<ReplayStep>,
+    transition_sequence: u64,
     catalog: &'catalog DataCatalog,
 }
 
@@ -293,21 +315,15 @@ impl<'catalog> BattleRunner<'catalog> {
         setup: &BattleSetup,
         catalog: &'catalog DataCatalog,
     ) -> Result<Self, BattleSetupError> {
-        let initial_snapshot = initialize_battle(setup, catalog)?;
         Ok(Self {
-            snapshot: initial_snapshot.clone(),
-            initial_snapshot,
-            replay_steps: Vec::new(),
+            snapshot: initialize_battle(setup, catalog)?,
+            transition_sequence: 0,
             catalog,
         })
     }
 
     pub fn snapshot(&self) -> &BattleSnapshot {
         &self.snapshot
-    }
-
-    pub fn export_replay(&self) -> BattleReplay {
-        BattleReplay::new(self.initial_snapshot.clone(), self.replay_steps.clone())
     }
 
     pub fn is_finished(&self) -> bool {
@@ -332,19 +348,48 @@ impl<'catalog> BattleRunner<'catalog> {
         requests: &[ActionRequest],
         shield_decisions: &[ShieldDecisionRequest],
     ) -> Result<TurnTransition, BattleRunnerError> {
+        self.advance_turn_inner(requests, shield_decisions, None)
+    }
+
+    pub fn advance_turn_with_observer(
+        &mut self,
+        requests: &[ActionRequest],
+        shield_decisions: &[ShieldDecisionRequest],
+        observer: &mut dyn TransitionObserver,
+    ) -> Result<TurnTransition, BattleRunnerError> {
+        self.advance_turn_inner(requests, shield_decisions, Some(observer))
+    }
+
+    fn advance_turn_inner(
+        &mut self,
+        requests: &[ActionRequest],
+        shield_decisions: &[ShieldDecisionRequest],
+        mut observer: Option<&mut dyn TransitionObserver>,
+    ) -> Result<TurnTransition, BattleRunnerError> {
         self.ensure_in_progress()?;
+        let before_snapshot = observer.as_ref().map(|_| self.snapshot.clone());
         let transition = resolve_turn_with_shield_decisions(
             &self.snapshot,
             requests,
             shield_decisions,
             self.catalog,
         )?;
-        self.replay_steps.push(ReplayStep {
-            action_requests: requests.to_vec(),
-            shield_decisions: shield_decisions.to_vec(),
-            resulting_snapshot: transition.next_snapshot.clone(),
-        });
         self.snapshot = transition.next_snapshot.clone();
+        let sequence_index = self.transition_sequence;
+        self.transition_sequence = self.transition_sequence.saturating_add(1);
+        if let (Some(observer), Some(before_snapshot)) = (observer.as_deref_mut(), before_snapshot)
+        {
+            observer.on_transition(TransitionObservation {
+                sequence_index,
+                turn_before: before_snapshot.turn,
+                turn_after: transition.next_snapshot.turn,
+                action_requests: requests,
+                shield_decisions,
+                events: &transition.timeline_entries,
+                before_snapshot: &before_snapshot,
+                after_snapshot: &transition.next_snapshot,
+            });
+        }
         Ok(transition)
     }
 
@@ -352,14 +397,42 @@ impl<'catalog> BattleRunner<'catalog> {
         &mut self,
         observation_version: &str,
         schema_revision: u64,
-        mut select_action: F,
+        select_action: F,
     ) -> Result<TurnTransition, BattleRunnerError>
     where
         F: FnMut(&Observation) -> PlayerAction,
     {
+        let requests =
+            self.collect_action_requests(observation_version, schema_revision, select_action)?;
+        self.advance_turn(&requests)
+    }
+
+    pub fn advance_with_action_selector_and_observer<F>(
+        &mut self,
+        observation_version: &str,
+        schema_revision: u64,
+        select_action: F,
+        observer: &mut dyn TransitionObserver,
+    ) -> Result<TurnTransition, BattleRunnerError>
+    where
+        F: FnMut(&Observation) -> PlayerAction,
+    {
+        let requests =
+            self.collect_action_requests(observation_version, schema_revision, select_action)?;
+        self.advance_turn_with_observer(&requests, &[], observer)
+    }
+
+    fn collect_action_requests<F>(
+        &self,
+        observation_version: &str,
+        schema_revision: u64,
+        mut select_action: F,
+    ) -> Result<Vec<ActionRequest>, BattleRunnerError>
+    where
+        F: FnMut(&Observation) -> PlayerAction,
+    {
         self.ensure_in_progress()?;
-        let requests: Vec<_> = self
-            .snapshot
+        self.snapshot
             .participants
             .iter()
             .map(|participant| {
@@ -375,8 +448,8 @@ impl<'catalog> BattleRunner<'catalog> {
                     action: select_action(&observation),
                 })
             })
-            .collect::<Result<_, ObservationError>>()?;
-        self.advance_turn(&requests)
+            .collect::<Result<_, ObservationError>>()
+            .map_err(BattleRunnerError::from)
     }
 
     fn ensure_in_progress(&self) -> Result<(), BattleRunnerError> {
@@ -390,11 +463,14 @@ impl<'catalog> BattleRunner<'catalog> {
 #[cfg(test)]
 mod tests {
     use crate::data::DataCatalog;
-    use crate::model::{ControllerType, IndividualValues, PlayerAction, PokemonBuildInput, Side};
+    use crate::model::{
+        ActionRequest, ControllerType, IndividualValues, PlayerAction, PokemonBuildInput,
+        ShieldDecision, ShieldDecisionRequest, Side,
+    };
 
     use super::{
         BattleRunner, BattleRunnerError, BattleSetup, BattleSetupError, ParticipantSetup,
-        PokemonSetup, initialize_battle,
+        PokemonSetup, TransitionObservation, initialize_battle,
     };
 
     fn setup() -> BattleSetup {
@@ -517,22 +593,102 @@ mod tests {
     }
 
     #[test]
-    fn exported_replay_round_trips_and_reconstructs_every_snapshot() {
+    fn observer_receives_selector_generated_requests_and_snapshots() {
         let catalog = DataCatalog::embedded().unwrap();
         let mut runner = BattleRunner::new(&setup(), &catalog).unwrap();
-        for _ in 0..3 {
-            runner
-                .advance_with_action_selector("1.0", 1, |observation| PlayerAction::FastMove {
+        let mut observed_requests = Vec::new();
+        let mut observer = |observation: TransitionObservation<'_>| {
+            assert_eq!(observation.sequence_index, 0);
+            assert_eq!(observation.turn_before, 0);
+            assert_eq!(observation.turn_after, 1);
+            assert_eq!(observation.before_snapshot.turn, 0);
+            assert_eq!(observation.after_snapshot.turn, 1);
+            assert_eq!(observation.shield_decisions.len(), 0);
+            assert_eq!(observation.events.len(), 2);
+            observed_requests.extend(observation.action_requests.iter().cloned());
+        };
+
+        runner
+            .advance_with_action_selector_and_observer(
+                "1.0",
+                1,
+                |observation| PlayerAction::FastMove {
                     move_id: observation.self_view.active.fast_move.clone(),
-                })
-                .unwrap();
-        }
+                },
+                &mut observer,
+            )
+            .unwrap();
 
-        let replay = runner.export_replay();
-        let serialized = serde_json::to_string(&replay).unwrap();
-        let deserialized: crate::replay::BattleReplay = serde_json::from_str(&serialized).unwrap();
-        let replayed_snapshot = deserialized.replay(&catalog).unwrap();
+        assert_eq!(observed_requests.len(), 2);
+        assert_eq!(observed_requests[0].participant_id, "left");
+        assert_eq!(observed_requests[1].participant_id, "right");
+    }
 
-        assert_eq!(replayed_snapshot, *runner.snapshot());
+    #[test]
+    fn observer_receives_no_turn_forced_switch_transitions_in_sequence() {
+        let catalog = DataCatalog::embedded().unwrap();
+        let mut runner = BattleRunner::new(&setup(), &catalog).unwrap();
+        let mut bench_pokemon = runner.snapshot.participants[0].team[0].clone();
+        bench_pokemon.slot = 1;
+        bench_pokemon.pokemon_id = "left-bench".to_owned();
+        bench_pokemon.is_active = false;
+        runner.snapshot.participants[0].team.push(bench_pokemon);
+        runner
+            .snapshot
+            .pending_forced_swaps
+            .push(crate::model::PendingForcedSwap {
+                participant_id: "left".to_owned(),
+                options: vec![1],
+            });
+        let request = ActionRequest {
+            participant_id: "left".to_owned(),
+            turn: 0,
+            action: PlayerAction::Swap { target_slot: 1 },
+        };
+        let mut observed = Vec::new();
+        let mut observer = |observation: TransitionObservation<'_>| {
+            observed.push((
+                observation.sequence_index,
+                observation.turn_before,
+                observation.turn_after,
+                observation.events.len(),
+                observation.shield_decisions.len(),
+            ));
+        };
+        let shield_decision = ShieldDecisionRequest {
+            participant_id: "right".to_owned(),
+            turn: 0,
+            decision: ShieldDecision::NoShield,
+        };
+
+        runner
+            .advance_turn_with_observer(&[request], &[shield_decision], &mut observer)
+            .unwrap();
+        runner
+            .advance_turn_with_observer(&[], &[], &mut observer)
+            .unwrap();
+
+        assert_eq!(observed, vec![(0, 0, 0, 1, 1), (1, 0, 1, 0, 0)]);
+        assert_eq!(runner.snapshot().participants[0].active_pokemon_index, 1);
+    }
+
+    #[test]
+    fn resolver_failure_does_not_notify_observer_or_advance_sequence() {
+        let catalog = DataCatalog::embedded().unwrap();
+        let mut runner = BattleRunner::new(&setup(), &catalog).unwrap();
+        runner.snapshot.participants[1].team[0].combat_stats.defense = 0.0;
+        runner.snapshot.participants[0].team[0]
+            .move_state
+            .fast_move_turns_remaining = 1;
+        let mut notifications = 0;
+        let mut observer = |_: TransitionObservation<'_>| notifications += 1;
+
+        assert!(
+            runner
+                .advance_turn_with_observer(&[], &[], &mut observer)
+                .is_err()
+        );
+        assert_eq!(notifications, 0);
+        assert_eq!(runner.transition_sequence, 0);
     }
 }
