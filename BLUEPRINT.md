@@ -552,6 +552,22 @@ Every transition should emit or retain enough data to support:
 - turn-by-turn analysis
 - export to external tools
 
+### 7.5 Replay recording and serialization
+
+The battle runner owns the current snapshot and transition orchestration; it does not retain replay history. After each successful transition, including no-turn forced-switch continuations, it may notify optional observers with an immutable transition record containing:
+
+- the transition sequence index and turn before and after resolution
+- the participant action requests submitted for the transition
+- the shield decisions submitted for the transition
+- the timeline events emitted by the transition
+- read-only access to the before and after snapshots for observers that need them
+
+The observer notification occurs only after the transition succeeds and must not mutate either snapshot. When actions are collected through an internal selector, the notification includes the actual requests produced by that selector, not only requests supplied directly by a caller.
+
+A replay recorder is an external observer and owns retention and serialization. A versioned replay artifact contains the initial snapshot, including its `rngState`, and an ordered record of each transition's action requests, shield decisions, and emitted events. Each event is stored once in the replay history; the artifact does not store a full resulting snapshot for every transition. Replaying starts from the initial snapshot, supplies the recorded requests and decisions to the resolver in order, and verifies the generated events against the recorded events.
+
+Replay artifacts identify the rules and battle-data catalog revision used to produce them. Replay requires a compatible revision. Optional checkpoints may be added for seeking or faster verification, but must not duplicate the prior event history; a checkpoint stores state plus a position in the single event stream.
+
 ## 8. Battle Result Contract
 
 For the 1v1 milestone, the engine must return a battle result payload with:
@@ -725,7 +741,10 @@ The following design decisions have been accepted and are now part of the implem
 - The battle engine owns the canonical immutable turn snapshot.
 - The player interface owns observation generation and action normalization.
 - The resolver owns action ordering and all battle-state transitions.
-- Replay/history and TUI layers are presentation or serialization concerns and must not mutate live engine state.
+- The battle runner owns current-state orchestration, not accumulated replay history.
+- Replay observers receive immutable successful-transition notifications; external replay recorders own history retention and serialization and must not mutate live engine state.
+- Replay history stores initial state and transition inputs/events once; it does not retain a full timeline-bearing snapshot for every step.
+- The TUI is a presentation concern and must not mutate live engine state.
 
 ### 12.6 Validation strategy
 
@@ -739,5 +758,4 @@ The following design decisions have been accepted and are now part of the implem
 The blueprint still leaves the following as explicit follow-up items for implementation detail work:
 
 - the final, exhaustive event schema for the replay timeline
-- the exact serialization boundary for battle logs and turn snapshots
 - any additional compatibility deltas to document when matching edge-case pvpoke behaviors
