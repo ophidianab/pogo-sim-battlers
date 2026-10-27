@@ -467,6 +467,7 @@ mod tests {
         ActionRequest, ControllerType, IndividualValues, PlayerAction, PokemonBuildInput,
         ShieldDecision, ShieldDecisionRequest, Side,
     };
+    use crate::replay::{ReplayError, ReplayRecorder};
 
     use super::{
         BattleRunner, BattleRunnerError, BattleSetup, BattleSetupError, ParticipantSetup,
@@ -690,5 +691,58 @@ mod tests {
         );
         assert_eq!(notifications, 0);
         assert_eq!(runner.transition_sequence, 0);
+    }
+
+    #[test]
+    fn replay_recorder_stores_compact_events_and_replays_with_catalog_revision() {
+        let catalog = DataCatalog::embedded().unwrap();
+        let mut runner = BattleRunner::new(&setup(), &catalog).unwrap();
+        let initial_snapshot = runner.snapshot().clone();
+        let mut recorder = ReplayRecorder::new(initial_snapshot, "embedded-test-v1").unwrap();
+
+        for _ in 0..3 {
+            runner
+                .advance_with_action_selector_and_observer(
+                    "1.0",
+                    1,
+                    |observation| PlayerAction::FastMove {
+                        move_id: observation.self_view.active.fast_move.clone(),
+                    },
+                    &mut recorder,
+                )
+                .unwrap();
+        }
+
+        let replay = recorder.finish();
+        let json = serde_json::to_value(&replay).unwrap();
+        assert_eq!(json["initialSnapshot"]["rngState"], 42);
+        assert_eq!(json["steps"].as_array().unwrap().len(), 3);
+        assert!(json["steps"][0].get("events").is_some());
+        assert!(json["steps"][0].get("resultingSnapshot").is_none());
+
+        let serialized = serde_json::to_string(&replay).unwrap();
+        let deserialized: crate::replay::BattleReplay = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(
+            deserialized.replay(&catalog, "embedded-test-v1").unwrap(),
+            *runner.snapshot()
+        );
+        assert!(matches!(
+            deserialized.replay(&catalog, "different-catalog"),
+            Err(ReplayError::CatalogRevisionMismatch { .. })
+        ));
+
+        let mut changed_rules = deserialized.clone();
+        changed_rules.rules_revision = "old-rules".to_owned();
+        assert!(matches!(
+            changed_rules.replay(&catalog, "embedded-test-v1"),
+            Err(ReplayError::RulesRevisionMismatch { .. })
+        ));
+
+        let mut changed_events = deserialized;
+        changed_events.steps[0].events.clear();
+        assert!(matches!(
+            changed_events.replay(&catalog, "embedded-test-v1"),
+            Err(ReplayError::EventMismatch { step_index: 0 })
+        ));
     }
 }
