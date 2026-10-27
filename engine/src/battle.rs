@@ -9,6 +9,7 @@ use crate::model::{
     ShieldDecisionRequest, Side, StatStages,
 };
 use crate::observations::{ObservationError, build_observation};
+use crate::replay::{BattleReplay, ReplayStep};
 use crate::transition::{TransitionError, TurnTransition, resolve_turn_with_shield_decisions};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -281,7 +282,9 @@ impl From<TransitionError> for BattleRunnerError {
 }
 
 pub struct BattleRunner<'catalog> {
+    initial_snapshot: BattleSnapshot,
     snapshot: BattleSnapshot,
+    replay_steps: Vec<ReplayStep>,
     catalog: &'catalog DataCatalog,
 }
 
@@ -290,14 +293,21 @@ impl<'catalog> BattleRunner<'catalog> {
         setup: &BattleSetup,
         catalog: &'catalog DataCatalog,
     ) -> Result<Self, BattleSetupError> {
+        let initial_snapshot = initialize_battle(setup, catalog)?;
         Ok(Self {
-            snapshot: initialize_battle(setup, catalog)?,
+            snapshot: initial_snapshot.clone(),
+            initial_snapshot,
+            replay_steps: Vec::new(),
             catalog,
         })
     }
 
     pub fn snapshot(&self) -> &BattleSnapshot {
         &self.snapshot
+    }
+
+    pub fn export_replay(&self) -> BattleReplay {
+        BattleReplay::new(self.initial_snapshot.clone(), self.replay_steps.clone())
     }
 
     pub fn is_finished(&self) -> bool {
@@ -329,6 +339,11 @@ impl<'catalog> BattleRunner<'catalog> {
             shield_decisions,
             self.catalog,
         )?;
+        self.replay_steps.push(ReplayStep {
+            action_requests: requests.to_vec(),
+            shield_decisions: shield_decisions.to_vec(),
+            resulting_snapshot: transition.next_snapshot.clone(),
+        });
         self.snapshot = transition.next_snapshot.clone();
         Ok(transition)
     }
@@ -499,5 +514,25 @@ mod tests {
             runner.advance_turn(&[]),
             Err(BattleRunnerError::Finished)
         ));
+    }
+
+    #[test]
+    fn exported_replay_round_trips_and_reconstructs_every_snapshot() {
+        let catalog = DataCatalog::embedded().unwrap();
+        let mut runner = BattleRunner::new(&setup(), &catalog).unwrap();
+        for _ in 0..3 {
+            runner
+                .advance_with_action_selector("1.0", 1, |observation| PlayerAction::FastMove {
+                    move_id: observation.self_view.active.fast_move.clone(),
+                })
+                .unwrap();
+        }
+
+        let replay = runner.export_replay();
+        let serialized = serde_json::to_string(&replay).unwrap();
+        let deserialized: crate::replay::BattleReplay = serde_json::from_str(&serialized).unwrap();
+        let replayed_snapshot = deserialized.replay(&catalog).unwrap();
+
+        assert_eq!(replayed_snapshot, *runner.snapshot());
     }
 }
