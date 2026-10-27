@@ -157,6 +157,37 @@ pub fn resolve_turn_with_shield_decisions(
     }
 
     let mut charged_order = snapshot.pending_charged_moves.clone();
+    let equal_attack_priority = match charged_order.as_slice() {
+        [first, second] => {
+            let participant_index = |participant_id: &str| {
+                snapshot
+                    .participants
+                    .iter()
+                    .position(|participant| participant.participant_id == participant_id)
+            };
+            let first_index = participant_index(&first.participant_id);
+            let second_index = participant_index(&second.participant_id);
+            let attack = |index: usize| {
+                snapshot.participants[index].team[snapshot.participants[index].active_pokemon_index]
+                    .combat_stats
+                    .attack
+            };
+            match (first_index, second_index) {
+                (Some(first_index), Some(second_index))
+                    if first_index != second_index
+                        && attack(first_index).total_cmp(&attack(second_index)).is_eq() =>
+                {
+                    Some(if roll_chance(&mut next_snapshot.rng_state, 0.5) {
+                        first_index
+                    } else {
+                        second_index
+                    })
+                }
+                _ => None,
+            }
+        }
+        _ => None,
+    };
     charged_order.sort_by(|left, right| {
         let left_index = snapshot
             .participants
@@ -182,7 +213,13 @@ pub fn resolve_turn_with_shield_decisions(
             .unwrap_or_default();
         right_attack
             .total_cmp(&left_attack)
-            .then_with(|| left_index.cmp(&right_index))
+            .then_with(|| match equal_attack_priority {
+                Some(priority_index) if left_index == priority_index => std::cmp::Ordering::Less,
+                Some(priority_index) if right_index == priority_index => {
+                    std::cmp::Ordering::Greater
+                }
+                _ => left_index.cmp(&right_index),
+            })
     });
     next_snapshot.pending_charged_moves.clear();
 
@@ -639,14 +676,18 @@ fn roll_chance(rng_state: &mut u64, chance: f64) -> bool {
         return true;
     }
 
+    let value = next_random(rng_state);
+    let sample = (value >> 11) as f64 / (1_u64 << 53) as f64;
+    sample < chance
+}
+
+fn next_random(rng_state: &mut u64) -> u64 {
     *rng_state = rng_state.wrapping_add(0x9e37_79b9_7f4a_7c15);
     let mut value = *rng_state;
     value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
     value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
     value ^= value >> 31;
-
-    let sample = (value >> 11) as f64 / (1_u64 << 53) as f64;
-    sample < chance
+    value
 }
 
 fn resolve_pending_forced_swaps(
@@ -1636,17 +1677,9 @@ mod tests {
     }
 
     #[test]
-    fn equal_attack_charged_moves_resolve_left_to_right() {
-        let mut state = snapshot();
+    fn equal_attack_charged_moves_use_seeded_coin_flip_and_replay_deterministically() {
         let catalog = DataCatalog::embedded().unwrap();
         let charged_cost = catalog.charged_move_cost("AQUA_JET").unwrap();
-        for participant in &mut state.participants {
-            let active = &mut participant.team[0];
-            active.current_hp = 500;
-            active.max_hp = 500;
-            active.energy = charged_cost;
-            active.move_state.charged_moves.push("AQUA_JET".to_owned());
-        }
         let queue_actions = [
             ActionRequest {
                 participant_id: "left".to_owned(),
@@ -1663,8 +1696,6 @@ mod tests {
                 },
             },
         ];
-        let queued = resolve_turn(&state, &queue_actions, &catalog).unwrap();
-        let queued_state = queued.next_snapshot;
         let resolve_actions = [
             ActionRequest {
                 participant_id: "left".to_owned(),
@@ -1678,24 +1709,47 @@ mod tests {
             },
         ];
 
-        let transition = resolve_turn(&queued_state, &resolve_actions, &catalog).unwrap();
-        let charged_participants: Vec<_> = transition.next_snapshot.timeline[1]
-            .events
-            .iter()
-            .filter(|event| event.kind == TimelineEventKind::Charged)
-            .map(|event| event.participant_id.as_str())
-            .collect();
-
-        assert_eq!(charged_participants, vec!["left", "right"]);
-        assert!(transition.next_snapshot.participants[0].team[0].current_hp < 500);
-        assert!(transition.next_snapshot.participants[1].team[0].current_hp < 500);
-        assert!(
-            transition
+        let simulate = |rng_state| {
+            let mut state = snapshot();
+            state.rng_state = rng_state;
+            for participant in &mut state.participants {
+                let active = &mut participant.team[0];
+                active.current_hp = 500;
+                active.max_hp = 500;
+                active.energy = charged_cost;
+                active.move_state.charged_moves.push("AQUA_JET".to_owned());
+            }
+            let queued = resolve_turn(&state, &queue_actions, &catalog).unwrap();
+            resolve_turn(&queued.next_snapshot, &resolve_actions, &catalog)
+                .unwrap()
                 .next_snapshot
-                .participants
+        };
+
+        let left_first = simulate(3);
+        let right_first = simulate(0);
+        let charged_order = |state: &crate::model::BattleSnapshot| {
+            state.timeline[1]
+                .events
                 .iter()
-                .all(|participant| { !participant.team[0].flags.fainted })
+                .filter(|event| event.kind == TimelineEventKind::Charged)
+                .map(|event| event.participant_id.clone())
+                .collect::<Vec<_>>()
+        };
+
+        assert_eq!(
+            charged_order(&left_first),
+            vec!["left".to_owned(), "right".to_owned()]
         );
+        assert_eq!(
+            charged_order(&right_first),
+            vec!["right".to_owned(), "left".to_owned()]
+        );
+        assert_eq!(left_first, simulate(3));
+        assert_eq!(right_first, simulate(0));
+        assert!(left_first.participants[0].team[0].current_hp < 500);
+        assert!(left_first.participants[1].team[0].current_hp < 500);
+        assert!(right_first.participants[0].team[0].current_hp < 500);
+        assert!(right_first.participants[1].team[0].current_hp < 500);
     }
 
     #[test]
