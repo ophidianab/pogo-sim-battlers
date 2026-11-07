@@ -5,19 +5,95 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BattleSnapshot {
-    pub battle_id: String,
-    pub turn: u32,
+    pub(crate) battle_id: String,
+    pub(crate) turn: u32,
     #[serde(default)]
-    pub rng_state: u64,
-    pub participants: Vec<ParticipantState>,
+    pub(crate) rng_state: u64,
+    pub(crate) participants: Vec<ParticipantState>,
     #[serde(default)]
-    pub pending_charged_moves: Vec<PendingChargedMove>,
+    pub(crate) pending_charged_moves: Vec<PendingChargedMove>,
     #[serde(default)]
-    pub pending_forced_swaps: Vec<PendingForcedSwap>,
+    pub(crate) pending_forced_swaps: Vec<PendingForcedSwap>,
     #[serde(default)]
-    pub timeline: Vec<TurnRecord>,
+    pub(crate) timeline: Vec<TurnRecord>,
     #[serde(default)]
-    pub metadata: BTreeMap<String, String>,
+    pub(crate) metadata: BTreeMap<String, String>,
+}
+
+impl BattleSnapshot {
+    pub fn new(
+        battle_id: impl Into<String>,
+        rng_state: u64,
+        participants: Vec<ParticipantState>,
+    ) -> Self {
+        Self {
+            battle_id: battle_id.into(),
+            turn: 0,
+            rng_state,
+            participants,
+            pending_charged_moves: Vec::new(),
+            pending_forced_swaps: Vec::new(),
+            timeline: Vec::new(),
+            metadata: BTreeMap::new(),
+        }
+    }
+
+    pub fn with_turn(mut self, turn: u32) -> Self {
+        self.turn = turn;
+        self
+    }
+
+    pub fn with_pending_charged_moves(mut self, moves: Vec<PendingChargedMove>) -> Self {
+        self.pending_charged_moves = moves;
+        self
+    }
+
+    pub fn with_pending_forced_swaps(mut self, swaps: Vec<PendingForcedSwap>) -> Self {
+        self.pending_forced_swaps = swaps;
+        self
+    }
+
+    pub fn with_timeline(mut self, timeline: Vec<TurnRecord>) -> Self {
+        self.timeline = timeline;
+        self
+    }
+
+    pub fn with_metadata(mut self, metadata: BTreeMap<String, String>) -> Self {
+        self.metadata = metadata;
+        self
+    }
+
+    pub fn battle_id(&self) -> &str {
+        &self.battle_id
+    }
+
+    pub fn turn(&self) -> u32 {
+        self.turn
+    }
+
+    pub fn rng_state(&self) -> u64 {
+        self.rng_state
+    }
+
+    pub fn participants(&self) -> &[ParticipantState] {
+        &self.participants
+    }
+
+    pub fn pending_charged_moves(&self) -> &[PendingChargedMove] {
+        &self.pending_charged_moves
+    }
+
+    pub fn pending_forced_swaps(&self) -> &[PendingForcedSwap] {
+        &self.pending_forced_swaps
+    }
+
+    pub fn timeline(&self) -> &[TurnRecord] {
+        &self.timeline
+    }
+
+    pub fn metadata(&self) -> &BTreeMap<String, String> {
+        &self.metadata
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

@@ -12,7 +12,7 @@ Implement the first milestone: a deterministic 1v1 battle engine that uses immut
 
 ## Phase 1: Core state model
 
-**Status: In progress** (the snapshot is immutable across transitions, but the public Rust fields do not enforce immutability)
+**Status: Complete** (public callers cannot mutate populated snapshots; transitions create the next snapshot from an owned engine copy)
 
 ### Tasks
 - [x] Define the canonical battle snapshot.
@@ -24,7 +24,7 @@ Implement the first milestone: a deterministic 1v1 battle engine that uses immut
 
 ### Acceptance criteria
 - All state is represented in Rust with clear ownership boundaries.
-- The snapshot is immutable by design.
+- Public callers cannot mutate a populated snapshot; state changes are exposed as new snapshots from transitions.
 - The schema matches the accepted JSON-style contract from the blueprint.
 
 ## Phase 2: Minimal battle loop
