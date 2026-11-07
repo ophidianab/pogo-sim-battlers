@@ -12,13 +12,15 @@ Implement the first milestone: a deterministic 1v1 battle engine that uses immut
 
 ## Phase 1: Core state model
 
+**Status: In progress** (the snapshot is immutable across transitions, but the public Rust fields do not enforce immutability)
+
 ### Tasks
-- Define the canonical immutable battle snapshot.
-- Define participant and team state structs.
-- Define Pokémon runtime state structs.
-- Define action request/response types.
-- Define observation payload types.
-- Define battle result payload types.
+- [x] Define the canonical battle snapshot.
+- [x] Define participant and team state structs.
+- [x] Define Pokémon runtime state structs.
+- [x] Define action request/response types.
+- [x] Define observation payload types.
+- [x] Define battle result payload types.
 
 ### Acceptance criteria
 - All state is represented in Rust with clear ownership boundaries.
@@ -27,12 +29,14 @@ Implement the first milestone: a deterministic 1v1 battle engine that uses immut
 
 ## Phase 2: Minimal battle loop
 
+**Status: Complete**
+
 ### Tasks
-- Create the battle engine runner.
-- Initialize a simple 1v1 battle state.
-- Collect participant actions per turn.
-- Validate actions before resolution.
-- Produce a next-state snapshot.
+- [x] Create the battle engine runner.
+- [x] Initialize a simple 1v1 battle state.
+- [x] Collect participant actions per turn.
+- [x] Validate actions before resolution.
+- [x] Produce a next-state snapshot.
 
 ### Acceptance criteria
 - The engine advances turn-by-turn from one snapshot to the next.
@@ -41,16 +45,18 @@ Implement the first milestone: a deterministic 1v1 battle engine that uses immut
 
 ## Phase 3: Rule resolution
 
+**Status: Complete**
+
 ### Tasks
-- Implement action ordering: swaps, charged moves, fast moves.
-- Implement fast-move duration tracking, completion timing, and action locks.
-- Implement charged-move stat effects and deterministic chance rolls.
-- Implement end-of-turn damage resolution.
-- Implement energy gain timing and same-turn spending rules.
-- Implement shield resolution and fallback behavior.
-- Implement forced replacement choices after fainting; auto-select only when exactly one living bench Pokémon remains.
-- Implement tie-breaking and priority ordering.
-- Replace the temporary left-first equal-attack CMP tie-break with a seeded 50/50 RNG coin flip; test both outcomes and deterministic replay.
+- [x] Implement action ordering: swaps, charged moves, fast moves.
+- [x] Implement fast-move duration tracking, completion timing, and action locks.
+- [x] Implement charged-move stat effects and deterministic chance rolls.
+- [x] Implement end-of-turn damage resolution.
+- [x] Implement energy gain timing and same-turn spending rules.
+- [x] Implement shield resolution and fallback behavior.
+- [x] Implement forced replacement choices after fainting; auto-select only when exactly one living bench Pokémon remains.
+- [x] Implement tie-breaking and priority ordering.
+- [x] Replace the temporary left-first equal-attack CMP tie-break with a seeded 50/50 RNG coin flip; test both outcomes and deterministic replay.
 
 ### Acceptance criteria
 - The engine preserves accepted timing semantics.
@@ -62,14 +68,17 @@ Implement the first milestone: a deterministic 1v1 battle engine that uses immut
 
 ## Phase 4: Replay and output contract
 
+**Status: Complete; optional checkpoints deferred**
+
 ### Tasks
-- Emit structured timeline events for each turn.
-- Emit immutable transition notifications to optional observers after every successful transition, including no-turn forced-switch continuations; include action requests, shield decisions, emitted events, and read-only before/after snapshots.
-- Implement an external replay recorder that stores the initial snapshot and each transition's inputs and events once; do not retain a full timeline-bearing snapshot for every step.
-- Serialize a versioned replay artifact with the initial RNG state and the rules/data-catalog revision required to reproduce the battle.
-- Replay the recorded inputs and verify the resulting event sequence; support optional checkpoints without duplicating prior history.
-- Build the battle result payload.
-- Include winner/loser, total turns, duration, and per-side result metadata.
+- [x] Emit structured timeline events for each turn.
+- [x] Emit immutable transition notifications to optional observers after every successful transition, including no-turn forced-switch continuations; include action requests, shield decisions, emitted events, and read-only before/after snapshots.
+- [x] Implement an external replay recorder that stores the initial snapshot and each transition's inputs and events once; do not retain a full timeline-bearing snapshot for every step.
+- [x] Serialize a versioned replay artifact with the initial RNG state and the rules/data-catalog revision required to reproduce the battle.
+- [x] Replay the recorded inputs and verify the resulting event sequence.
+- [ ] (Optional) Add replay checkpoints without duplicating prior history.
+- [x] Build the battle result payload.
+- [x] Include winner/loser, total turns, duration, and per-side result metadata.
 
 ### Acceptance criteria
 - The battle result includes the required timeline and summary fields.
@@ -79,17 +88,20 @@ Implement the first milestone: a deterministic 1v1 battle engine that uses immut
 
 ## Phase 5: Validation and regression tests
 
+**Status: In progress** (unit and replay tests pass; external compatibility fixtures remain)
+
 ### Tasks
-- Add unit tests for move timing and shield logic.
-- Add tests for guaranteed, shielded, chance-based, and distinct both-target charged-move effects.
-- Add tests for multi-turn fast-move duration, action locks, charged completion, and faint cancellation.
-- Add tests for swap-before-damage semantics.
-- Add tests for sole-candidate auto-switch and trainer-selected replacement when multiple bench Pokémon remain.
-- Add tests for energy timing and same-turn spending rules.
-- Add tests for equal-CMP coin-flip outcomes and replay, simultaneous fast-move knockouts, both participants locked in fast moves, and switch cooldown expiry.
-- Test that transition observers receive successful turn and no-turn transitions once, including selector-generated action requests, and are not notified for failed transitions.
-- Test compact replay serialization round-trips, reproduces the recorded event stream from the initial RNG state, and rejects incompatible rules/data-catalog revisions or mismatched events.
-- Add observation contract validation tests.
+- [x] Add unit tests for move timing and shield logic.
+- [x] Add tests for guaranteed, shielded, chance-based, and distinct both-target charged-move effects.
+- [x] Add tests for multi-turn fast-move duration, action locks, charged completion, and faint cancellation.
+- [x] Add tests for swap-before-damage semantics.
+- [x] Add tests for sole-candidate auto-switch and trainer-selected replacement when multiple bench Pokémon remain.
+- [x] Add tests for energy timing and same-turn spending rules.
+- [x] Add tests for equal-CMP coin-flip outcomes and replay, simultaneous fast-move knockouts, both participants locked in fast moves, and switch cooldown expiry.
+- [x] Test that transition observers receive successful turn and no-turn transitions once, including selector-generated action requests, and are not notified for failed transitions.
+- [x] Test compact replay serialization round-trips, reproduces the recorded event stream from the initial RNG state, and rejects incompatible rules/data-catalog revisions or mismatched events.
+- [x] Add observation contract validation tests.
+- [ ] Compare representative battle results against accepted PvPoke compatibility fixtures.
 
 ### Acceptance criteria
 - The 1v1 baseline passes the accepted compatibility tests.
