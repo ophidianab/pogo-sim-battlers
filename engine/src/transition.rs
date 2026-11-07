@@ -9,7 +9,7 @@ use crate::model::{
     ShieldDecision, ShieldDecisionRequest, TimelineEvent, TimelineEventKind, TurnRecord,
 };
 
-const TURN_DURATION_MS: u32 = 500;
+pub(crate) const TURN_DURATION_MS: u32 = 500;
 const VOLUNTARY_SWITCH_COOLDOWN_MS: u32 = 45_000;
 const VOLUNTARY_SWITCH_COOLDOWN_TURNS: u32 = VOLUNTARY_SWITCH_COOLDOWN_MS / TURN_DURATION_MS;
 

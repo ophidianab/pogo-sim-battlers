@@ -363,13 +363,16 @@ pub struct BattleResult {
     pub participants: Vec<ParticipantResult>,
     pub timeline: Vec<TurnRecord>,
     pub total_turns: u32,
+    #[serde(rename = "battleDuration")]
     pub battle_duration_ms: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BattleOutcome {
+    #[serde(rename = "participant_0_win")]
     Participant0Win,
+    #[serde(rename = "participant_1_win")]
     Participant1Win,
     Draw,
 }

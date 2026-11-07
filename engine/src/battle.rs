@@ -4,12 +4,15 @@ use std::fmt::{Display, Formatter};
 
 use crate::data::{DataCatalog, StatInitializationError};
 use crate::model::{
-    ActionRequest, BattleSnapshot, CombatStats, ControllerType, Cooldowns, MoveState, Observation,
-    ParticipantState, PlayerAction, PokemonBuildInput, PokemonFlags, PokemonState,
-    ShieldDecisionRequest, Side, StatStages, TimelineEvent,
+    ActionRequest, BattleOutcome, BattleResult, BattleSnapshot, CombatStats, ControllerType,
+    Cooldowns, MoveState, Observation, ParticipantResult, ParticipantState, PlayerAction,
+    PokemonBuildInput, PokemonFlags, PokemonState, ShieldDecisionRequest, Side, StatStages,
+    TimelineEvent,
 };
 use crate::observations::{ObservationError, build_observation};
-use crate::transition::{TransitionError, TurnTransition, resolve_turn_with_shield_decisions};
+use crate::transition::{
+    TURN_DURATION_MS, TransitionError, TurnTransition, resolve_turn_with_shield_decisions,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct BattleSetup {
@@ -130,6 +133,145 @@ impl Display for BattleSetupError {
 }
 
 impl Error for BattleSetupError {}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BattleResultError {
+    ParticipantCount,
+    BattleInProgress,
+    ZeroMaximumHp(String),
+}
+
+impl Display for BattleResultError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ParticipantCount => formatter.write_str("battle result requires exactly 1v1"),
+            Self::BattleInProgress => {
+                formatter.write_str("cannot build a result for an active battle")
+            }
+            Self::ZeroMaximumHp(participant_id) => {
+                write!(
+                    formatter,
+                    "participant {participant_id} has no maximum team HP"
+                )
+            }
+        }
+    }
+}
+
+impl Error for BattleResultError {}
+
+pub fn build_battle_result(snapshot: &BattleSnapshot) -> Result<BattleResult, BattleResultError> {
+    if snapshot.participants.len() != 2 {
+        return Err(BattleResultError::ParticipantCount);
+    }
+
+    let living: Vec<_> = snapshot
+        .participants
+        .iter()
+        .map(|participant| {
+            participant
+                .team
+                .iter()
+                .any(|pokemon| pokemon.current_hp > 0 && !pokemon.flags.fainted)
+        })
+        .collect();
+    if living.iter().all(|is_living| *is_living) {
+        return Err(BattleResultError::BattleInProgress);
+    }
+
+    let team_totals: Vec<_> = snapshot
+        .participants
+        .iter()
+        .map(|participant| {
+            let maximum_hp = participant
+                .team
+                .iter()
+                .fold(0_u32, |sum, pokemon| sum.saturating_add(pokemon.max_hp));
+            let final_hp = participant.team.iter().fold(0_u32, |sum, pokemon| {
+                let remaining_hp = if pokemon.flags.fainted {
+                    0
+                } else {
+                    pokemon.current_hp.min(pokemon.max_hp)
+                };
+                sum.saturating_add(remaining_hp)
+            });
+            (maximum_hp, final_hp)
+        })
+        .collect();
+
+    for (participant, (maximum_hp, _)) in snapshot.participants.iter().zip(&team_totals) {
+        if *maximum_hp == 0 {
+            return Err(BattleResultError::ZeroMaximumHp(
+                participant.participant_id.clone(),
+            ));
+        }
+    }
+
+    let outcome = match living.as_slice() {
+        [false, true] => BattleOutcome::Participant1Win,
+        [true, false] => BattleOutcome::Participant0Win,
+        [false, false] => BattleOutcome::Draw,
+        _ => return Err(BattleResultError::ParticipantCount),
+    };
+    let (winner, loser) = match outcome {
+        BattleOutcome::Participant0Win => (
+            Some(snapshot.participants[0].participant_id.clone()),
+            Some(snapshot.participants[1].participant_id.clone()),
+        ),
+        BattleOutcome::Participant1Win => (
+            Some(snapshot.participants[1].participant_id.clone()),
+            Some(snapshot.participants[0].participant_id.clone()),
+        ),
+        BattleOutcome::Draw => (None, None),
+    };
+
+    let participants = snapshot
+        .participants
+        .iter()
+        .enumerate()
+        .map(|(index, participant)| {
+            let (maximum_hp, final_hp) = team_totals[index];
+            let (opponent_maximum_hp, opponent_final_hp) = team_totals[1 - index];
+            let opponent_damage = opponent_maximum_hp.saturating_sub(opponent_final_hp);
+            ParticipantResult {
+                participant_id: participant.participant_id.clone(),
+                side: participant.side.clone(),
+                rating: calculate_rating(
+                    final_hp,
+                    maximum_hp,
+                    opponent_damage,
+                    opponent_maximum_hp,
+                ),
+                final_hp,
+                max_hp: maximum_hp,
+                opponent_damage,
+                opponent_max_hp: opponent_maximum_hp,
+            }
+        })
+        .collect();
+
+    Ok(BattleResult {
+        battle_id: snapshot.battle_id.clone(),
+        outcome,
+        winner,
+        loser,
+        participants,
+        timeline: snapshot.timeline.clone(),
+        total_turns: snapshot.turn,
+        battle_duration_ms: u64::from(snapshot.turn) * u64::from(TURN_DURATION_MS),
+    })
+}
+
+fn calculate_rating(
+    final_hp: u32,
+    maximum_hp: u32,
+    opponent_damage: u32,
+    opponent_maximum_hp: u32,
+) -> u16 {
+    let health_ratio = f64::from(final_hp) / f64::from(maximum_hp);
+    let damage_ratio = f64::from(opponent_damage) / f64::from(opponent_maximum_hp);
+    (500.0 * (health_ratio + damage_ratio)).floor() as u16
+}
 
 pub fn initialize_battle(
     setup: &BattleSetup,
@@ -326,6 +468,10 @@ impl<'catalog> BattleRunner<'catalog> {
         &self.snapshot
     }
 
+    pub fn result(&self) -> Result<BattleResult, BattleResultError> {
+        build_battle_result(&self.snapshot)
+    }
+
     pub fn is_finished(&self) -> bool {
         self.snapshot.participants.len() != 2
             || self.snapshot.participants.iter().any(|participant| {
@@ -464,14 +610,15 @@ impl<'catalog> BattleRunner<'catalog> {
 mod tests {
     use crate::data::DataCatalog;
     use crate::model::{
-        ActionRequest, ControllerType, IndividualValues, PlayerAction, PokemonBuildInput,
-        ShieldDecision, ShieldDecisionRequest, Side,
+        ActionRequest, BattleOutcome, ControllerType, IndividualValues, PlayerAction,
+        PokemonBuildInput, ShieldDecision, ShieldDecisionRequest, Side, TimelineEvent, TurnRecord,
     };
     use crate::replay::{ReplayError, ReplayRecorder};
 
     use super::{
-        BattleRunner, BattleRunnerError, BattleSetup, BattleSetupError, ParticipantSetup,
-        PokemonSetup, TransitionObservation, initialize_battle,
+        BattleResultError, BattleRunner, BattleRunnerError, BattleSetup, BattleSetupError,
+        ParticipantSetup, PokemonSetup, TransitionObservation, build_battle_result,
+        initialize_battle,
     };
 
     fn setup() -> BattleSetup {
@@ -744,5 +891,87 @@ mod tests {
             changed_events.replay(&catalog, "embedded-test-v1"),
             Err(ReplayError::EventMismatch { step_index: 0 })
         ));
+    }
+
+    #[test]
+    fn finished_battle_result_aggregates_team_hp_ratings_and_contract_fields() {
+        let catalog = DataCatalog::embedded().unwrap();
+        let mut runner = BattleRunner::new(&setup(), &catalog).unwrap();
+        let left = &mut runner.snapshot.participants[0];
+        left.team[0].max_hp = 100;
+        left.team[0].current_hp = 40;
+        let mut left_bench = left.team[0].clone();
+        left_bench.slot = 1;
+        left_bench.pokemon_id = "left-bench".to_owned();
+        left_bench.is_active = false;
+        left_bench.max_hp = 50;
+        left_bench.current_hp = 10;
+        left.team.push(left_bench);
+
+        let right = &mut runner.snapshot.participants[1].team[0];
+        right.max_hp = 80;
+        right.current_hp = 0;
+        right.flags.fainted = true;
+        runner.snapshot.turn = 7;
+        runner.snapshot.timeline.push(TurnRecord {
+            turn: 6,
+            timestamp: 3_000,
+            events: vec![TimelineEvent {
+                kind: crate::model::TimelineEventKind::Faint,
+                participant_id: "right".to_owned(),
+                target_participant_id: None,
+                move_id: None,
+                damage: None,
+                shielded: None,
+                buff_applied: None,
+                duration_ms: None,
+                species: Some("squirtle".to_owned()),
+            }],
+        });
+
+        let result = runner.result().unwrap();
+
+        assert_eq!(result.outcome, BattleOutcome::Participant0Win);
+        assert_eq!(result.winner.as_deref(), Some("left"));
+        assert_eq!(result.loser.as_deref(), Some("right"));
+        assert_eq!(result.participants[0].final_hp, 50);
+        assert_eq!(result.participants[0].max_hp, 150);
+        assert_eq!(result.participants[0].opponent_damage, 80);
+        assert_eq!(result.participants[0].opponent_max_hp, 80);
+        assert_eq!(result.participants[0].rating, 666);
+        assert_eq!(result.participants[1].final_hp, 0);
+        assert_eq!(result.participants[1].opponent_damage, 100);
+        assert_eq!(result.participants[1].rating, 333);
+        assert_eq!(result.total_turns, 7);
+        assert_eq!(result.battle_duration_ms, 3_500);
+        assert_eq!(result.timeline, runner.snapshot().timeline);
+
+        let json = serde_json::to_value(result).unwrap();
+        assert_eq!(json["outcome"], "participant_0_win");
+        assert_eq!(json["battleDuration"], 3_500);
+        assert!(json.get("battleDurationMs").is_none());
+    }
+
+    #[test]
+    fn result_builder_reports_draws_and_rejects_battles_in_progress() {
+        let catalog = DataCatalog::embedded().unwrap();
+        let mut runner = BattleRunner::new(&setup(), &catalog).unwrap();
+
+        assert!(matches!(
+            runner.result(),
+            Err(BattleResultError::BattleInProgress)
+        ));
+
+        for participant in &mut runner.snapshot.participants {
+            for pokemon in &mut participant.team {
+                pokemon.current_hp = 0;
+                pokemon.flags.fainted = true;
+            }
+        }
+        let result = build_battle_result(runner.snapshot()).unwrap();
+
+        assert_eq!(result.outcome, BattleOutcome::Draw);
+        assert_eq!(result.winner, None);
+        assert_eq!(result.loser, None);
     }
 }
