@@ -1,0 +1,233 @@
+{
+  "fixtureVersion": 1,
+  "caseId": "neutral-tackle-pidgey-rattata",
+  "reference": {
+    "repository": "git@github.com:pvpoke/pvpoke.git",
+    "commit": "3ca651c7c83f3d39704f33b28ac4ca01ae10bf16",
+    "gamemasterBlob": "f18467bc4ef139e47f357e05335ca0578c4c3857",
+    "generatorRevision": "pvpoke-node-harness-v1"
+  },
+  "input": {
+    "battleSetup": {
+      "battleId": "neutral-tackle-pidgey-rattata",
+      "rngSeed": 7,
+      "cpLimit": 1500,
+      "participants": [
+        {
+          "participantId": "left",
+          "controllerType": "scripted",
+          "shieldsRemaining": 0,
+          "team": [
+            {
+              "pokemonId": "left-pidgey",
+              "build": {
+                "speciesId": "pidgey",
+                "level": 1,
+                "ivs": {
+                  "attack": 0,
+                  "defense": 0,
+                  "hp": 0
+                },
+                "shadow": false
+              },
+              "fastMove": "TACKLE",
+              "chargedMoves": [
+                "AERIAL_ACE"
+              ]
+            }
+          ]
+        },
+        {
+          "participantId": "right",
+          "controllerType": "scripted",
+          "shieldsRemaining": 0,
+          "team": [
+            {
+              "pokemonId": "right-rattata",
+              "build": {
+                "speciesId": "rattata",
+                "level": 1,
+                "ivs": {
+                  "attack": 0,
+                  "defense": 0,
+                  "hp": 0
+                },
+                "shadow": false
+              },
+              "fastMove": "TACKLE",
+              "chargedMoves": [
+                "BODY_SLAM"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "steps": [
+      {
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 0,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "TACKLE"
+            }
+          },
+          {
+            "participantId": "right",
+            "turn": 0,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "TACKLE"
+            }
+          }
+        ],
+        "shieldDecisions": []
+      },
+      {
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 1,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "TACKLE"
+            }
+          },
+          {
+            "participantId": "right",
+            "turn": 1,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "TACKLE"
+            }
+          }
+        ],
+        "shieldDecisions": []
+      },
+      {
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 2,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "TACKLE"
+            }
+          },
+          {
+            "participantId": "right",
+            "turn": 2,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "TACKLE"
+            }
+          }
+        ],
+        "shieldDecisions": []
+      }
+    ]
+  },
+  "expectedResult": {
+    "battleId": "neutral-tackle-pidgey-rattata",
+    "outcome": "participant_1_win",
+    "winner": "right",
+    "loser": "left",
+    "participants": [
+      {
+        "participantId": "left",
+        "side": "left",
+        "rating": 450,
+        "finalHp": 0,
+        "maxHp": 11,
+        "opponentDamage": 9,
+        "opponentMaxHp": 10
+      },
+      {
+        "participantId": "right",
+        "side": "right",
+        "rating": 550,
+        "finalHp": 1,
+        "maxHp": 10,
+        "opponentDamage": 11,
+        "opponentMaxHp": 11
+      }
+    ],
+    "timeline": [
+      {
+        "turn": 0,
+        "timestamp": 0,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 1,
+        "timestamp": 500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 2,
+        "timestamp": 1000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "faint",
+            "participantId": "left",
+            "species": "pidgey"
+          }
+        ]
+      }
+    ],
+    "totalTurns": 3,
+    "battleDuration": 1500
+  }
+}

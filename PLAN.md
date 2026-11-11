@@ -101,16 +101,17 @@ Implement the first milestone: a deterministic 1v1 battle engine that uses immut
 - [x] Test that transition observers receive successful turn and no-turn transitions once, including selector-generated action requests, and are not notified for failed transitions.
 - [x] Test compact replay serialization round-trips, reproduces the recorded event stream from the initial RNG state, and rejects incompatible rules/data-catalog revisions or mismatched events.
 - [x] Add observation contract validation tests.
-- [ ] Compare representative battle results against accepted PvPoke compatibility fixtures:
+- [ ] Compare representative battle results against accepted PvPoke compatibility fixtures (single-active fast-move coverage passes; scenario coverage remains):
   - [x] **Manual prerequisite resolved:** Use the local `/home/aaron/code/pvpoke` checkout, upstream `git@github.com:pvpoke/pvpoke.git`, commit `3ca651c7c83f3d39704f33b28ac4ca01ae10bf16` (2026-07-30), with `src/data/gamemaster.json` blob `f18467bc4ef139e47f357e05335ca0578c4c3857`. The tracked checkout is clean; its untracked `SPEC.md` is not part of the reference.
-  - [ ] Document the harness invocation and any local runtime prerequisites once the harness is implemented.
+  - [x] Document the invocation and runtime: `PVPOKE_DIR=~/code/pvpoke CONTAINER_ENGINE=podman sh engine/tools/pvpoke/generate-fixture.sh <fixture.json>`; Node 20 runs in the container, so host Node/PHP are not required.
   - [x] Define the versioned fixture schema in [BLUEPRINT.md](BLUEPRINT.md#127-pvpoke-compatibility-fixture-contract): provenance, battle setup/RNG seed, ordered action and shield inputs, and expected `BattleResult`.
-  - [ ] Build a harness that runs the pinned PvPoke runtime from fixture inputs and emits normalized expected JSON.
-  - [ ] Add an explicit fixture-regeneration command; commit generated golden JSON so normal Rust tests remain offline and deterministic.
-  - [ ] Capture and commit a simple deterministic, neutral fast-move battle as the first golden fixture.
-  - [ ] Add a Rust integration test that loads each committed fixture, runs the same setup and inputs, and compares outcome, winner/loser, HP/damage totals, ratings, turn count, duration, and ordered timeline events.
-  - [ ] Report fixture ID and first differing JSON path on comparison failure.
-  - [ ] Expand fixtures incrementally to charged moves with and without shields, type effectiveness, deterministic charged effects, multi-turn fast moves, swaps, and faint/replacement behavior.
+  - [x] Build the Node VM harness for fixtures with one active Pokémon per side; it loads the pinned PvPoke scripts and Game Master data and emits normalized expected JSON.
+  - [x] Add an explicit container-based fixture-regeneration command; committed golden JSON keeps ordinary Rust tests offline and deterministic.
+  - [x] Capture and commit a deterministic neutral fast-move fixture for Pidgey versus Rattata using Tackle.
+  - [x] Add a Rust integration test that loads committed fixtures, runs their action inputs, and compares the complete normalized result.
+  - [x] Report fixture ID and first differing JSON path on comparison failure.
+  - [ ] Add single-active fixtures for charged moves with and without shields, type effectiveness, and deterministic charged effects.
+  - [ ] Extend the reference adapter for multi-Pokémon teams, swaps, and faint/replacement scenarios, or record the precise PvPoke simulation-mode limitation and corresponding compatibility delta.
   - [ ] Add chance-based or equal-CMP fixtures only when the reference RNG algorithm and draw ordering can reproduce their outcomes; otherwise retain targeted seeded engine tests without claiming PvPoke parity.
   - [ ] Document each intentional compatibility delta and require an explanation and provenance update when golden outputs change.
 
