@@ -753,6 +753,25 @@ The following design decisions have been accepted and are now part of the implem
 - Replay tests validate that generated timelines reconstruct the same battle state.
 - Observation contract tests validate version compatibility and explicit visibility rules.
 
+### 12.7 PvPoke compatibility fixture contract
+
+Compatibility fixtures are versioned JSON files generated against a pinned PvPoke source revision and its matching Game Master data. The committed fixtures are the offline golden inputs for Rust tests; the reference runtime is invoked only by an explicit fixture-generation command.
+
+Each fixture contains:
+
+- `fixtureVersion`: fixture format version, initially `1`
+- `caseId`: stable, unique scenario name
+- `reference`: upstream repository, exact source commit, Game Master data blob/revision, and generator/normalizer revision
+- `input.battleSetup`: battle ID, RNG seed, and the two ordered participants, including controller type, starting shields, and each Pokémon's ID, build input, fast move, and charged moves
+- `input.steps`: ordered resolver calls; each step contains the participant action requests and shield decisions supplied for that call. Include no-turn forced-switch continuations as their own steps.
+- `expectedResult`: the complete normalized `BattleResult` contract, including outcome, participants and ratings, duration, and ordered timeline
+
+Action requests and shield decisions use the engine's existing JSON contracts. The fixture normalizer maps PvPoke output into the `BattleResult` contract without discarding provenance. A fixture comparison is exact for all normalized fields and timeline ordering; any field that cannot be mapped faithfully must be documented as an intentional compatibility delta rather than silently omitted. Failure output identifies the fixture ID and first differing JSON path.
+
+Each committed fixture is self-contained with respect to battle inputs and expected output. It does not embed the PvPoke source or Game Master file; the provenance identifies the pinned external oracle. Normal Rust tests consume committed goldens offline. Regeneration requires the pinned PvPoke checkout and matching Game Master revision, and must be an explicit command so expected output changes can be reviewed.
+
+The initial fixture set starts with a deterministic neutral fast-move battle, then adds shielded and unshielded charged moves, type effectiveness, deterministic charged effects, multi-turn fast moves, swaps, and faint/replacement behavior. Chance-based or equal-CMP fixtures are included only if the reference RNG algorithm and draw ordering reproduce the same outcomes; otherwise those behaviors remain covered by seeded engine tests without asserting cross-engine RNG parity.
+
 ## 13. Remaining Open Design Questions
 
 The blueprint still leaves the following as explicit follow-up items for implementation detail work:
