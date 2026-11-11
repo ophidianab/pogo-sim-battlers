@@ -35,6 +35,36 @@ pub struct PokemonSetup {
     pub build: PokemonBuildInput,
     pub fast_move: String,
     pub charged_moves: Vec<String>,
+    starting_hp: Option<u32>,
+    starting_energy: u32,
+}
+
+impl PokemonSetup {
+    pub fn new(
+        pokemon_id: impl Into<String>,
+        build: PokemonBuildInput,
+        fast_move: impl Into<String>,
+        charged_moves: Vec<String>,
+    ) -> Self {
+        Self {
+            pokemon_id: pokemon_id.into(),
+            build,
+            fast_move: fast_move.into(),
+            charged_moves,
+            starting_hp: None,
+            starting_energy: 0,
+        }
+    }
+
+    pub fn with_starting_hp(mut self, starting_hp: u32) -> Self {
+        self.starting_hp = Some(starting_hp);
+        self
+    }
+
+    pub fn with_starting_energy(mut self, starting_energy: u32) -> Self {
+        self.starting_energy = starting_energy;
+        self
+    }
 }
 
 pub struct TransitionObservation<'a> {
@@ -359,14 +389,17 @@ pub fn initialize_battle(
                 pokemon_id: pokemon_setup.pokemon_id.clone(),
                 species: species_id.clone(),
                 is_active: slot == 0,
-                current_hp: initialized.max_hp,
+                current_hp: pokemon_setup
+                    .starting_hp
+                    .filter(|hp| *hp > 0)
+                    .map_or(initialized.max_hp, |hp| hp.min(initialized.max_hp)),
                 max_hp: initialized.max_hp,
                 combat_stats: CombatStats {
                     attack: initialized.combat_stats.attack,
                     defense: initialized.combat_stats.defense,
                 },
                 stat_stages: StatStages::default(),
-                energy: 0,
+                energy: pokemon_setup.starting_energy.min(100),
                 pending_energy_gain: 0,
                 cooldowns: Cooldowns {
                     fast_move_ms: 0,
@@ -642,9 +675,9 @@ mod tests {
             participant_id: participant_id.to_owned(),
             controller_type: ControllerType::Scripted,
             shields_remaining: 2,
-            team: vec![PokemonSetup {
-                pokemon_id: format!("{participant_id}-pokemon"),
-                build: PokemonBuildInput {
+            team: vec![PokemonSetup::new(
+                format!("{participant_id}-pokemon"),
+                PokemonBuildInput {
                     species_id: species_id.to_owned(),
                     level: 20.0,
                     ivs: IndividualValues {
@@ -654,9 +687,9 @@ mod tests {
                     },
                     shadow: false,
                 },
-                fast_move: fast_move.to_owned(),
-                charged_moves: vec![charged_move.to_owned()],
-            }],
+                fast_move,
+                vec![charged_move.to_owned()],
+            )],
         }
     }
 
@@ -670,6 +703,7 @@ mod tests {
         assert_eq!(snapshot.rng_state, 42);
         assert_eq!(snapshot.participants[0].side, Side::Left);
         assert_eq!(snapshot.participants[1].side, Side::Right);
+        assert_eq!(snapshot.participants[0].team[0].energy, 0);
         assert_eq!(
             snapshot.participants[0].team[0].current_hp,
             snapshot.participants[0].team[0].max_hp

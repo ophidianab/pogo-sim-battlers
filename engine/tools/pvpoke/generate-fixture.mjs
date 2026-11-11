@@ -150,6 +150,33 @@ for (const [participantIndex, pokemon] of activePokemon.entries()) {
 battle.setSandboxMode(true);
 
 const timelineActions = [];
+const shieldDecisionsByParticipantTurn = new Map();
+const expandedSteps = fixture.input.steps.flatMap((template) => {
+  const repeatCount = template.repeatCount ?? 1;
+  if (!Number.isInteger(repeatCount) || repeatCount < 1) {
+    fail("step repeatCount must be a positive integer");
+  }
+  return Array.from({ length: repeatCount }, (_, offset) => ({
+    ...template,
+    actionRequests: template.actionRequests.map((request) => ({
+      ...request,
+      turn: request.turn + offset,
+    })),
+    shieldDecisions: (template.shieldDecisions ?? []).map((decision) => ({
+      ...decision,
+      turn: decision.turn + offset,
+    })),
+  }));
+});
+
+for (const step of expandedSteps) {
+  for (const decision of step.shieldDecisions ?? []) {
+    shieldDecisionsByParticipantTurn.set(
+      `${decision.participantId}:${decision.turn}`,
+      decision,
+    );
+  }
+}
 for (const step of fixture.input.steps) {
   if (!Array.isArray(step.actionRequests)) {
     fail("each input.steps item must contain actionRequests");
@@ -173,10 +200,6 @@ for (const step of fixture.input.steps) {
   if (requestTurn === undefined) {
     fail("each step must have action requests for both participants");
   }
-
-  const shieldsByParticipant = new Map(
-    (step.shieldDecisions ?? []).map((decision) => [decision.participantId, decision]),
-  );
 
   for (const [participantId, participantIndex] of participantsById) {
     const request = requestsByParticipant.get(participantId);
@@ -232,10 +255,7 @@ for (const step of fixture.input.steps) {
 
     if (actionType === "chargedMove") {
       const targetId = setup.participants[targetParticipantIndex].participantId;
-      const shieldDecision = shieldsByParticipant.get(targetId);
-      if (shieldDecision && shieldDecision.turn !== requestTurn) {
-        fail(`shield decision for ${targetId} has the wrong turn`);
-      }
+      const shieldDecision = shieldDecisionsByParticipantTurn.get(`${targetId}:${requestTurn + 1}`);
       var shielded = shieldDecision?.decision === "shield";
     } else {
       var shielded = false;
@@ -259,7 +279,7 @@ for (const step of fixture.input.steps) {
 battle.setActions(timelineActions);
 const rawTimeline = battle.simulate();
 const actionEventTypes = new Set(["tap interaction wait"]);
-const turns = rawTimeline.reduce((maximum, event) => {
+const actionTurns = rawTimeline.reduce((maximum, event) => {
   if (
     event.type.startsWith("fast ") ||
     event.type.startsWith("charged ") ||
@@ -269,11 +289,18 @@ const turns = rawTimeline.reduce((maximum, event) => {
   }
   return maximum;
 }, 0);
-const timeline = Array.from({ length: turns }, (_, turn) => ({
+const timeline = Array.from({ length: actionTurns }, (_, turn) => ({
   turn,
   timestamp: turn * TURN_DURATION_MS,
   events: [],
 }));
+const chargedResolutionTurns = new Set(
+  expandedSteps.flatMap((step) =>
+    step.actionRequests
+      .filter((request) => request.actionType === "chargedMove")
+      .map((request) => `${request.participantId}:${request.turn + 1}`),
+  ),
+);
 const shieldEvents = new Set();
 
 for (const event of rawTimeline) {
@@ -307,16 +334,34 @@ for (const event of rawTimeline) {
   if (!Number.isInteger(actor) || actor < 0 || actor > 1) {
     fail(`invalid actor on PvPoke event ${event.type}`);
   }
-  const resolvedTurn = event.type === "faint"
-    ? lastDamageTurnByParticipant.get(actor) ?? Math.max(0, turn - 1)
-    : event.type === "switchAvailable"
-      ? Math.max(0, turn - 1)
-    : turn;
+  let resolvedTurn = turn;
+  if (event.type.startsWith("charged ")) {
+    resolvedTurn += 1;
+  } else if (event.type === "faint") {
+    resolvedTurn = lastDamageTurnByParticipant.get(actor) ?? Math.max(0, turn - 1);
+  } else if (event.type === "switchAvailable") {
+    resolvedTurn = Math.max(0, turn - 1);
+  }
   if (!Number.isInteger(resolvedTurn) || resolvedTurn < 0 || resolvedTurn >= timeline.length) {
-    fail(`event turn ${event.turn} is outside the simulated battle`);
+    if (resolvedTurn < 0) {
+      fail(`event turn ${event.turn} is outside the simulated battle`);
+    }
+    while (timeline.length <= resolvedTurn) {
+      timeline.push({
+        turn: timeline.length,
+        timestamp: timeline.length * TURN_DURATION_MS,
+        events: [],
+      });
+  }
   }
 
   const participant = setup.participants[actor];
+  if (
+    event.type === "tap interaction wait" &&
+    chargedResolutionTurns.has(`${participant.participantId}:${resolvedTurn}`)
+  ) {
+    continue;
+  }
   let normalized;
   if (event.type.startsWith("fast ")) {
     const move = moveForEvent(actor, event);
@@ -372,6 +417,7 @@ for (const event of rawTimeline) {
 }
 
 const pvpokeRatings = battle.getBattleRatings();
+const turns = timeline.length;
 const finalPokemon = battle.getPokemon();
 const teamTotals = finalPokemon.map((pokemon) => ({
   maxHp: pokemon.stats.hp,
@@ -418,9 +464,19 @@ fixture.expectedResult = {
   battleDuration: turns * TURN_DURATION_MS,
 };
 
-fixture.input.steps = fixture.input.steps.filter((step) =>
-  step.actionRequests.some((request) => request.turn < turns),
-);
+fixture.input.steps = fixture.input.steps.flatMap((template) => {
+  const baseTurn = template.actionRequests[0]?.turn;
+  const repeatCount = template.repeatCount ?? 1;
+  if (baseTurn === undefined || baseTurn >= turns) {
+    return [];
+  }
+  const usedRepeatCount = Math.min(repeatCount, turns - baseTurn);
+  return [{
+    ...template,
+    ...(usedRepeatCount > 1 ? { repeatCount: usedRepeatCount } : {}),
+    ...(usedRepeatCount === 1 ? { repeatCount: undefined } : {}),
+  }];
+});
 
 const output = `${JSON.stringify(fixture, null, 2)}\n`;
 const temporaryPath = `${outputPath}.tmp`;

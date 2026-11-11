@@ -762,11 +762,13 @@ Each fixture contains:
 - `fixtureVersion`: fixture format version, initially `1`
 - `caseId`: stable, unique scenario name
 - `reference`: upstream repository, exact source commit, Game Master data blob/revision, and generator/normalizer revision
-- `input.battleSetup`: battle ID, RNG seed, and the two ordered participants, including controller type, starting shields, and each Pokémon's ID, build input, fast move, and charged moves
-- `input.steps`: ordered resolver calls; each step contains the participant action requests and shield decisions supplied for that call. Include no-turn forced-switch continuations as their own steps.
+- `input.battleSetup`: battle ID, RNG seed, and the two ordered participants, including controller type, starting shields, and each Pokémon's ID, build input, fast move, charged moves, and optional `startingHp`/`startingEnergy` overrides
+- `input.steps`: ordered resolver calls; each step contains the participant action requests and shield decisions supplied for that call. Include no-turn forced-switch continuations as their own steps. A step may use `repeatCount` to encode identical consecutive requests compactly; expansion increments each request/decision turn once per repetition.
 - `expectedResult`: the complete normalized `BattleResult` contract, including outcome, participants and ratings, duration, and ordered timeline
 
 Action requests and shield decisions use the engine's existing JSON contracts. The fixture normalizer maps PvPoke output into the `BattleResult` contract without discarding provenance. A fixture comparison is exact for all normalized fields and timeline ordering; any field that cannot be mapped faithfully must be documented as an intentional compatibility delta rather than silently omitted. Failure output identifies the fixture ID and first differing JSON path.
+
+One known timeline normalization delta is the `tap interaction wait` marker PvPoke emits for the actor whose queued charged move resolves on that turn. Rust represents the charged action lock in snapshot state and emits the charged event, but does not emit a separate wait event for that lock. The normalizer omits only this marker when it coincides with that participant's queued charged-move resolution; wait events for incomplete multi-turn fast moves remain in comparisons.
 
 Each committed fixture is self-contained with respect to battle inputs and expected output. It does not embed the PvPoke source or Game Master file; the provenance identifies the pinned external oracle. Normal Rust tests consume committed goldens offline. Regeneration requires the pinned PvPoke checkout and matching Game Master revision, and must be an explicit command so expected output changes can be reviewed.
 

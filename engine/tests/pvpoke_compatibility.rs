@@ -32,7 +32,7 @@ fn committed_pvpoke_fixtures_match_battle_results() {
         let setup = parse_setup(&fixture["input"]["battleSetup"]);
         let mut runner = BattleRunner::new(&setup, &catalog).unwrap();
 
-        for step in fixture["input"]["steps"].as_array().unwrap() {
+        for step in expand_steps(&fixture["input"]["steps"]) {
             let requests: Vec<ActionRequest> =
                 serde_json::from_value(step["actionRequests"].clone()).unwrap();
             let shield_decisions: Vec<ShieldDecisionRequest> =
@@ -67,12 +67,21 @@ fn parse_setup(value: &Value) -> BattleSetup {
                 .as_array()
                 .unwrap()
                 .iter()
-                .map(|pokemon| PokemonSetup {
-                    pokemon_id: pokemon["pokemonId"].as_str().unwrap().to_owned(),
-                    build: serde_json::from_value::<PokemonBuildInput>(pokemon["build"].clone())
-                        .unwrap(),
-                    fast_move: pokemon["fastMove"].as_str().unwrap().to_owned(),
-                    charged_moves: serde_json::from_value(pokemon["chargedMoves"].clone()).unwrap(),
+                .map(|pokemon| {
+                    let mut setup = PokemonSetup::new(
+                        pokemon["pokemonId"].as_str().unwrap(),
+                        serde_json::from_value::<PokemonBuildInput>(pokemon["build"].clone())
+                            .unwrap(),
+                        pokemon["fastMove"].as_str().unwrap(),
+                        serde_json::from_value(pokemon["chargedMoves"].clone()).unwrap(),
+                    );
+                    if let Some(starting_hp) = pokemon["startingHp"].as_u64() {
+                        setup = setup.with_starting_hp(starting_hp as u32);
+                    }
+                    if let Some(starting_energy) = pokemon["startingEnergy"].as_u64() {
+                        setup = setup.with_starting_energy(starting_energy as u32);
+                    }
+                    setup
                 })
                 .collect();
             ParticipantSetup {
@@ -96,6 +105,36 @@ fn parse_setup(value: &Value) -> BattleSetup {
                 panic!("expected two participants, got {}", participants.len())
             }),
     }
+}
+
+fn expand_steps(templates: &Value) -> Vec<Value> {
+    templates
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|template| {
+            let repeat_count = template["repeatCount"].as_u64().unwrap_or(1) as usize;
+            (0..repeat_count).map(move |offset| {
+                let mut step = template.clone();
+                let step_object = step.as_object_mut().unwrap();
+                step_object.remove("repeatCount");
+                for request in step_object["actionRequests"].as_array_mut().unwrap() {
+                    let turn = request["turn"].as_u64().unwrap() + offset as u64;
+                    request["turn"] = Value::from(turn);
+                }
+                for decision in step_object
+                    .entry("shieldDecisions")
+                    .or_insert_with(|| Value::Array(Vec::new()))
+                    .as_array_mut()
+                    .unwrap()
+                {
+                    let turn = decision["turn"].as_u64().unwrap() + offset as u64;
+                    decision["turn"] = Value::from(turn);
+                }
+                step
+            })
+        })
+        .collect()
 }
 
 fn first_difference(expected: &Value, actual: &Value, path: String) -> Option<String> {
@@ -132,13 +171,24 @@ fn first_difference(expected: &Value, actual: &Value, path: String) -> Option<St
                     return Some(difference);
                 }
             }
-            (expected.len() != actual.len()).then(|| {
-                format!(
-                    "{path}: expected array length {}, got {}",
+            if expected.len() == actual.len() {
+                None
+            } else {
+                let first_extra = expected
+                    .get(actual.len())
+                    .map(|value| format!("; expected-only item: {value}"))
+                    .or_else(|| {
+                        actual
+                            .get(expected.len())
+                            .map(|value| format!("; actual-only item: {value}"))
+                    })
+                    .unwrap_or_default();
+                Some(format!(
+                    "{path}: expected array length {}, got {}{first_extra}",
                     expected.len(),
                     actual.len()
-                )
-            })
+                ))
+            }
         }
         _ if expected != actual => Some(format!("{path}: expected {expected}, got {actual}")),
         _ => None,

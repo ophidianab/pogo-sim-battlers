@@ -1,0 +1,607 @@
+{
+  "fixtureVersion": 1,
+  "caseId": "charged-surf-shielded",
+  "reference": {
+    "repository": "git@github.com:pvpoke/pvpoke.git",
+    "commit": "3ca651c7c83f3d39704f33b28ac4ca01ae10bf16",
+    "gamemasterBlob": "f18467bc4ef139e47f357e05335ca0578c4c3857",
+    "generatorRevision": "pvpoke-node-harness-v1"
+  },
+  "input": {
+    "battleSetup": {
+      "battleId": "charged-surf-shielded",
+      "rngSeed": 7,
+      "cpLimit": 1500,
+      "participants": [
+        {
+          "participantId": "left",
+          "controllerType": "scripted",
+          "shieldsRemaining": 0,
+          "team": [
+            {
+              "pokemonId": "left-lanturn",
+              "build": {
+                "speciesId": "lanturn",
+                "level": 20,
+                "ivs": {
+                  "attack": 10,
+                  "defense": 10,
+                  "hp": 10
+                },
+                "shadow": false
+              },
+              "fastMove": "WATER_GUN",
+              "chargedMoves": [
+                "SURF"
+              ],
+              "startingEnergy": 45
+            }
+          ]
+        },
+        {
+          "participantId": "right",
+          "controllerType": "scripted",
+          "shieldsRemaining": 1,
+          "team": [
+            {
+              "pokemonId": "right-pidgey",
+              "build": {
+                "speciesId": "pidgey",
+                "level": 20,
+                "ivs": {
+                  "attack": 10,
+                  "defense": 10,
+                  "hp": 10
+                },
+                "shadow": false
+              },
+              "fastMove": "TACKLE",
+              "chargedMoves": [
+                "AERIAL_ACE"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "steps": [
+      {
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 0,
+            "actionType": "chargedMove",
+            "payload": {
+              "moveId": "SURF"
+            }
+          },
+          {
+            "participantId": "right",
+            "turn": 0,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "TACKLE"
+            }
+          }
+        ],
+        "shieldDecisions": []
+      },
+      {
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 1,
+            "actionType": "wait"
+          },
+          {
+            "participantId": "right",
+            "turn": 1,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "TACKLE"
+            }
+          }
+        ],
+        "shieldDecisions": [
+          {
+            "participantId": "right",
+            "turn": 1,
+            "decision": "shield"
+          }
+        ]
+      },
+      {
+        "repeatCount": 15,
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 2,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "WATER_GUN"
+            }
+          },
+          {
+            "participantId": "right",
+            "turn": 2,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "TACKLE"
+            }
+          }
+        ],
+        "shieldDecisions": []
+      },
+      {
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 17,
+            "actionType": "chargedMove",
+            "payload": {
+              "moveId": "SURF"
+            }
+          },
+          {
+            "participantId": "right",
+            "turn": 17,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "TACKLE"
+            }
+          }
+        ],
+        "shieldDecisions": []
+      },
+      {
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 18,
+            "actionType": "wait"
+          },
+          {
+            "participantId": "right",
+            "turn": 18,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "TACKLE"
+            }
+          }
+        ],
+        "shieldDecisions": []
+      }
+    ]
+  },
+  "expectedResult": {
+    "battleId": "charged-surf-shielded",
+    "outcome": "participant_0_win",
+    "winner": "left",
+    "loser": "right",
+    "participants": [
+      {
+        "participantId": "left",
+        "side": "left",
+        "rating": 891,
+        "finalHp": 130,
+        "maxHp": 166,
+        "opponentDamage": 77,
+        "opponentMaxHp": 77
+      },
+      {
+        "participantId": "right",
+        "side": "right",
+        "rating": 108,
+        "finalHp": 0,
+        "maxHp": 77,
+        "opponentDamage": 36,
+        "opponentMaxHp": 166
+      }
+    ],
+    "timeline": [
+      {
+        "turn": 0,
+        "timestamp": 0,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 2,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 1,
+        "timestamp": 500,
+        "events": [
+          {
+            "kind": "charged",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "SURF",
+            "damage": 1,
+            "shielded": true,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 2,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 2,
+        "timestamp": 1000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 5,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 2,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 3,
+        "timestamp": 1500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 5,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 2,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 4,
+        "timestamp": 2000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 5,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 2,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 5,
+        "timestamp": 2500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 5,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 2,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 6,
+        "timestamp": 3000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 5,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 2,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 7,
+        "timestamp": 3500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 5,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 2,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 8,
+        "timestamp": 4000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 5,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 2,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 9,
+        "timestamp": 4500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 5,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 2,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 10,
+        "timestamp": 5000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 5,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 2,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 11,
+        "timestamp": 5500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 5,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 2,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 12,
+        "timestamp": 6000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 5,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 2,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 13,
+        "timestamp": 6500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 5,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 2,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 14,
+        "timestamp": 7000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 5,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 2,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 15,
+        "timestamp": 7500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 5,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 2,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 16,
+        "timestamp": 8000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 5,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 2,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 17,
+        "timestamp": 8500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 2,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 18,
+        "timestamp": 9000,
+        "events": [
+          {
+            "kind": "charged",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "SURF",
+            "damage": 110,
+            "shielded": false,
+            "durationMs": 500
+          },
+          {
+            "kind": "faint",
+            "participantId": "right",
+            "species": "pidgey"
+          }
+        ]
+      }
+    ],
+    "totalTurns": 19,
+    "battleDuration": 9500
+  }
+}

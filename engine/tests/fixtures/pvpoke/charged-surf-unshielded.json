@@ -1,0 +1,179 @@
+{
+  "fixtureVersion": 1,
+  "caseId": "charged-surf-unshielded",
+  "reference": {
+    "repository": "git@github.com:pvpoke/pvpoke.git",
+    "commit": "3ca651c7c83f3d39704f33b28ac4ca01ae10bf16",
+    "gamemasterBlob": "f18467bc4ef139e47f357e05335ca0578c4c3857",
+    "generatorRevision": "pvpoke-node-harness-v1"
+  },
+  "input": {
+    "battleSetup": {
+      "battleId": "charged-surf-unshielded",
+      "rngSeed": 7,
+      "cpLimit": 1500,
+      "participants": [
+        {
+          "participantId": "left",
+          "controllerType": "scripted",
+          "shieldsRemaining": 0,
+          "team": [
+            {
+              "pokemonId": "left-lanturn",
+              "build": {
+                "speciesId": "lanturn",
+                "level": 20,
+                "ivs": {
+                  "attack": 10,
+                  "defense": 10,
+                  "hp": 10
+                },
+                "shadow": false
+              },
+              "fastMove": "WATER_GUN",
+              "chargedMoves": [
+                "SURF"
+              ],
+              "startingEnergy": 45
+            }
+          ]
+        },
+        {
+          "participantId": "right",
+          "controllerType": "scripted",
+          "shieldsRemaining": 0,
+          "team": [
+            {
+              "pokemonId": "right-pidgey",
+              "build": {
+                "speciesId": "pidgey",
+                "level": 20,
+                "ivs": {
+                  "attack": 10,
+                  "defense": 10,
+                  "hp": 10
+                },
+                "shadow": false
+              },
+              "fastMove": "TACKLE",
+              "chargedMoves": [
+                "AERIAL_ACE"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "steps": [
+      {
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 0,
+            "actionType": "chargedMove",
+            "payload": {
+              "moveId": "SURF"
+            }
+          },
+          {
+            "participantId": "right",
+            "turn": 0,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "TACKLE"
+            }
+          }
+        ],
+        "shieldDecisions": []
+      },
+      {
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 1,
+            "actionType": "wait"
+          },
+          {
+            "participantId": "right",
+            "turn": 1,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "TACKLE"
+            }
+          }
+        ],
+        "shieldDecisions": [
+          {
+            "participantId": "right",
+            "turn": 1,
+            "decision": "no_shield"
+          }
+        ]
+      }
+    ]
+  },
+  "expectedResult": {
+    "battleId": "charged-surf-unshielded",
+    "outcome": "participant_0_win",
+    "winner": "left",
+    "loser": "right",
+    "participants": [
+      {
+        "participantId": "left",
+        "side": "left",
+        "rating": 993,
+        "finalHp": 164,
+        "maxHp": 166,
+        "opponentDamage": 77,
+        "opponentMaxHp": 77
+      },
+      {
+        "participantId": "right",
+        "side": "right",
+        "rating": 6,
+        "finalHp": 0,
+        "maxHp": 77,
+        "opponentDamage": 2,
+        "opponentMaxHp": 166
+      }
+    ],
+    "timeline": [
+      {
+        "turn": 0,
+        "timestamp": 0,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 2,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 1,
+        "timestamp": 500,
+        "events": [
+          {
+            "kind": "charged",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "SURF",
+            "damage": 110,
+            "shielded": false,
+            "durationMs": 500
+          },
+          {
+            "kind": "faint",
+            "participantId": "right",
+            "species": "pidgey"
+          }
+        ]
+      }
+    ],
+    "totalTurns": 2,
+    "battleDuration": 1000
+  }
+}
