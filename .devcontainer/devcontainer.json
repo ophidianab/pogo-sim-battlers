@@ -11,8 +11,7 @@
 				"fill-labs.dependi",
 				"vadimcn.vscode-lldb",
 				"tamasfe.even-better-toml",
-                "github.copilot",
-                "github.copilot-chat"
+				"github.copilot-chat"
 			],
 			"settings": {
 				"rust-analyzer.cargo.runBuildScripts": true,
