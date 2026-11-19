@@ -16,14 +16,14 @@ jobs:
         working-directory: engine
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust 1.99
         run: rustup toolchain install 1.99 --profile minimal --component clippy --component rustfmt
 
       # Proptest pulls in a sizeable dev-dependency tree, so cache the build.
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -54,7 +54,7 @@ jobs:
       # If a property test fails, preserve the seed it wrote for the next fix.
       - name: Upload proptest regressions
         if: failure() && steps.test.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: proptest-regressions
           path: engine/tests/properties.proptest-regressions
