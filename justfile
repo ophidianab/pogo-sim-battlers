@@ -4,9 +4,18 @@ cargo := "cd engine && cargo"
 default:
     @just --list
 
-# Run all unit, compatibility, and snapshot tests.
+# Run all unit, compatibility, snapshot, and property tests.
+# Property cases default to 64 locally; raise PROPTEST_CASES for a longer run.
 test:
-    {{cargo}} test --all-targets
+    export PROPTEST_CASES=${PROPTEST_CASES:-64} && {{cargo}} test --all-targets
+
+# Run only the property tests at the default local case count.
+props:
+    export PROPTEST_CASES=${PROPTEST_CASES:-64} && {{cargo}} test --test properties
+
+# Long property run for rule changes; CI runs 512 cases on every push.
+props-thorough:
+    export PROPTEST_CASES=${PROPTEST_CASES:-1024} && {{cargo}} test --test properties
 
 # Run only the PvPoke compatibility fixtures.
 compat:

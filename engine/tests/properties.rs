@@ -619,8 +619,6 @@ proptest! {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(64))]
-
     #[test]
     fn battles_finish_and_report_a_consistent_result(plan in battle_plan()) {
         let catalog = DataCatalog::embedded().expect("the embedded gamemaster must load");

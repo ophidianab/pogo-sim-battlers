@@ -12,12 +12,18 @@ repository root through `just`, or pass `--manifest-path engine/Cargo.toml`.
 
 ```sh
 just check       # fmt-check + clippy -D warnings + all tests
-just test        # cargo test --all-targets
+just test        # cargo test --all-targets (64 property cases)
+just props       # property tests only (64 cases)
+just props-thorough  # 1024 property cases, for rule changes
 just compat      # only the PvPoke compatibility fixtures
 just lint        # cargo clippy --all-targets -- -D warnings
 just fmt         # cargo fmt --all
 just fmt-check   # cargo fmt --all -- --check
 ```
+
+Property cases default to 64 locally so `just check` stays fast; set
+`PROPTEST_CASES` to raise it, or run `just props-thorough`. CI runs 512 cases on
+every push, and persisted regression seeds replay in every mode.
 
 `engine/tests/properties.rs` holds the `proptest` cases: determinism, replay
 round-trip, snapshot JSON round-trip, per-turn state invariants, and the

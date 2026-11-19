@@ -40,8 +40,11 @@ jobs:
         run: cargo +1.99 clippy --all-targets --locked -- -D warnings
 
       # --all-targets includes tests/properties.rs, so the proptest cases run here.
+      # CI samples 512 cases per property; the local default is 64 (see justfile).
       - name: Test
         id: test
+        env:
+          PROPTEST_CASES: "512"
         run: cargo +1.99 test --all-targets --locked
 
       # A passing run must not leave newly discovered proptest seeds uncommitted.
