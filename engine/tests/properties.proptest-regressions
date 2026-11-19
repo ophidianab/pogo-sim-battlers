@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 0a661a04c48f0fbbece02ca9e6820af82b4b602b789d53094731c69fa97315aa # shrinks to plan = BattlePlan { rng_seed: 0, left_team_len: 1, right_team_len: 2, builds: [(5.5, IndividualValues { attack: 0, defense: 11, hp: 0 }), (1.0, IndividualValues { attack: 0, defense: 0, hp: 0 }), (1.0, IndividualValues { attack: 0, defense: 0, hp: 0 }), (1.0, IndividualValues { attack: 0, defense: 0, hp: 0 })], shields: [0, 0], starting_energy: [0, 0, 0, 0], turns: [] }

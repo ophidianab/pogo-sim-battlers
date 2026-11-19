@@ -751,6 +751,7 @@ The following design decisions have been accepted and are now part of the implem
 - Rule-level unit tests cover move ordering, shield behavior, swap timing, and energy timing.
 - Snapshot-transition tests assert exact next-state output for a fixed input set.
 - Replay tests validate that generated timelines reconstruct the same battle state.
+- Property tests cover invariants that must hold for every legal battle: determinism, replay equivalence, snapshot JSON fidelity, turn progression, and HP/energy/shield bounds. They assert invariants over generated inputs and do not replace the exact-value unit tests, which pin specific rule outputs.
 - Observation contract tests validate version compatibility and explicit visibility rules.
 
 ### 12.7 PvPoke compatibility fixture contract

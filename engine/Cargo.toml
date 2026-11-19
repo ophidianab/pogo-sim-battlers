@@ -5,4 +5,9 @@ edition = "2024"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# Combat stats are f64 and must survive snapshot/replay JSON round-trips
+# bit-for-bit; the default parser can be off by one ULP.
+serde_json = { version = "1", features = ["float_roundtrip"] }
+
+[dev-dependencies]
+proptest = "1.12.0"

@@ -19,6 +19,11 @@ just fmt         # cargo fmt --all
 just fmt-check   # cargo fmt --all -- --check
 ```
 
+`engine/tests/properties.rs` holds the `proptest` cases: determinism, replay
+round-trip, snapshot JSON round-trip, per-turn state invariants, and the
+finished-battle result contract. Add new rules invariants there rather than as
+one-off example tests.
+
 A change is not complete until `just check` passes.
 
 ## PvPoke fixtures
