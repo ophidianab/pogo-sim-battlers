@@ -543,7 +543,7 @@ impl<'catalog> BattleRunner<'catalog> {
         &mut self,
         requests: &[ActionRequest],
         shield_decisions: &[ShieldDecisionRequest],
-        mut observer: Option<&mut dyn TransitionObserver>,
+        observer: Option<&mut dyn TransitionObserver>,
     ) -> Result<TurnTransition, BattleRunnerError> {
         self.ensure_in_progress()?;
         let before_snapshot = observer.as_ref().map(|_| self.snapshot.clone());
@@ -556,8 +556,7 @@ impl<'catalog> BattleRunner<'catalog> {
         self.snapshot = transition.next_snapshot.clone();
         let sequence_index = self.transition_sequence;
         self.transition_sequence = self.transition_sequence.saturating_add(1);
-        if let (Some(observer), Some(before_snapshot)) = (observer.as_deref_mut(), before_snapshot)
-        {
+        if let (Some(observer), Some(before_snapshot)) = (observer, before_snapshot) {
             observer.on_transition(TransitionObservation {
                 sequence_index,
                 turn_before: before_snapshot.turn,

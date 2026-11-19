@@ -1,0 +1,11 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "lsp": true,
+  "formatter": true,
+  "references": {
+    "pvpoke": {
+      "path": "../pvpoke",
+      "description": "Pinned PvPoke reference implementation and Game Master data"
+    }
+  }
+}

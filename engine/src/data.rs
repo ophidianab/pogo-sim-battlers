@@ -136,11 +136,11 @@ pub struct TypeTraits {
 pub struct DamageConstants;
 
 impl DamageConstants {
-    pub const BONUS: f64 = 1.2999999523162841796875;
-    pub const SUPER_EFFECTIVE: f64 = 1.60000002384185791015625;
+    pub const BONUS: f64 = 1.299_999_952_316_284_2;
+    pub const SUPER_EFFECTIVE: f64 = 1.600_000_023_841_858;
     pub const RESISTED: f64 = 0.625;
     pub const DOUBLE_RESISTED: f64 = 0.390625;
-    pub const STAB: f64 = 1.2000000476837158203125;
+    pub const STAB: f64 = 1.200_000_047_683_715_8;
     pub const SHADOW_ATK: f64 = 1.2;
     pub const SHADOW_DEF: f64 = 0.83333331;
 }

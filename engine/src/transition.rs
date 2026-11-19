@@ -365,7 +365,9 @@ pub fn resolve_turn_with_shield_decisions(
     }
 
     let mut pending_moves = Vec::new();
-    for attacker_index in 0..next_snapshot.participants.len() {
+    for (attacker_index, complete_after_charge) in
+        complete_fast_after_charge.iter().copied().enumerate()
+    {
         if active_pokemon(&next_snapshot, attacker_index).is_err() {
             continue;
         }
@@ -379,7 +381,7 @@ pub fn resolve_turn_with_shield_decisions(
         }
 
         let attacker = active_pokemon_mut(&mut next_snapshot, attacker_index)?;
-        if complete_fast_after_charge[attacker_index] {
+        if complete_after_charge {
             attacker.move_state.fast_move_turns_remaining = 1;
         }
         attacker.move_state.fast_move_turns_remaining = attacker
@@ -1589,7 +1591,7 @@ mod tests {
         let event = &next.timeline[1].events[0];
 
         assert_eq!(next, second.next_snapshot);
-        assert_eq!(event.buff_applied.is_some(), true);
+        assert!(event.buff_applied.is_some());
         assert_ne!(next.rng_state, queued_state.rng_state);
         assert_eq!(
             next.participants[0].team[0].stat_stages.attack_stage(),
