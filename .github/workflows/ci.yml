@@ -1,0 +1,58 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: engine
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust 1.99
+        run: rustup toolchain install 1.99 --profile minimal --component clippy --component rustfmt
+
+      # Proptest pulls in a sizeable dev-dependency tree, so cache the build.
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            engine/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('engine/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Check formatting
+        run: cargo +1.99 fmt --all -- --check
+
+      - name: Lint
+        run: cargo +1.99 clippy --all-targets --locked -- -D warnings
+
+      # --all-targets includes tests/properties.rs, so the proptest cases run here.
+      - name: Test
+        id: test
+        run: cargo +1.99 test --all-targets --locked
+
+      # A passing run must not leave newly discovered proptest seeds uncommitted.
+      - name: Check for uncommitted proptest regressions
+        run: git diff --exit-code -- tests/properties.proptest-regressions
+
+      # If a property test fails, preserve the seed it wrote for the next fix.
+      - name: Upload proptest regressions
+        if: failure() && steps.test.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: proptest-regressions
+          path: engine/tests/properties.proptest-regressions
+          if-no-files-found: ignore
