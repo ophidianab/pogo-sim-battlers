@@ -10,6 +10,8 @@ use crate::model::{
 };
 
 pub(crate) const TURN_DURATION_MS: u32 = 500;
+/// PvPoke caps a Pokemon's energy at 100; fast-move overflow is discarded.
+pub(crate) const MAX_ENERGY: u32 = 100;
 const VOLUNTARY_SWITCH_COOLDOWN_MS: u32 = 45_000;
 const VOLUNTARY_SWITCH_COOLDOWN_TURNS: u32 = VOLUNTARY_SWITCH_COOLDOWN_MS / TURN_DURATION_MS;
 
@@ -465,7 +467,10 @@ pub fn resolve_turn_with_shield_decisions(
 
     for pending in pending_moves {
         let attacker = active_pokemon_mut(&mut next_snapshot, pending.attacker_index)?;
-        attacker.energy = attacker.energy.saturating_add(pending.energy_gain);
+        attacker.energy = attacker
+            .energy
+            .saturating_add(pending.energy_gain)
+            .min(MAX_ENERGY);
         timeline_entries.push(pending.event);
 
         let target_index = pending.target_index;
@@ -827,7 +832,7 @@ mod tests {
         ShieldDecision, ShieldDecisionRequest, Side, StatStages, TimelineEventKind,
     };
 
-    use super::{resolve_turn, resolve_turn_with_shield_decisions};
+    use super::{MAX_ENERGY, resolve_turn, resolve_turn_with_shield_decisions};
 
     fn pokemon(slot: usize, species: &str) -> PokemonState {
         PokemonState {
@@ -1220,6 +1225,58 @@ mod tests {
         assert_eq!(next.timeline[0].events.len(), 2);
         assert_eq!(next.timeline[0].events[0].kind, TimelineEventKind::Charged);
         assert_eq!(next.timeline[0].events[1].kind, TimelineEventKind::Faint);
+    }
+
+    #[test]
+    fn fast_move_energy_gain_is_capped_at_one_hundred() {
+        let mut state = snapshot();
+        let catalog = DataCatalog::embedded().unwrap();
+        let gain = catalog.move_definition("TACKLE").unwrap().energy_gain;
+        assert!(gain >= 2, "the cap test needs headroom above 100");
+
+        let requests = [
+            ActionRequest {
+                participant_id: "left".to_owned(),
+                turn: state.turn,
+                action: PlayerAction::FastMove {
+                    move_id: "TACKLE".to_owned(),
+                },
+            },
+            ActionRequest {
+                participant_id: "right".to_owned(),
+                turn: state.turn,
+                action: PlayerAction::Wait,
+            },
+        ];
+
+        state.participants[0].team[0].energy = MAX_ENERGY - gain + 2;
+        let transition = resolve_turn(&state, &requests, &catalog).unwrap();
+        assert_eq!(
+            transition.next_snapshot.participants[0].team[0].energy,
+            MAX_ENERGY
+        );
+
+        let capped_state = transition.next_snapshot;
+        let capped_turn = capped_state.turn;
+        let capped_requests = [
+            ActionRequest {
+                participant_id: "left".to_owned(),
+                turn: capped_turn,
+                action: PlayerAction::FastMove {
+                    move_id: "TACKLE".to_owned(),
+                },
+            },
+            ActionRequest {
+                participant_id: "right".to_owned(),
+                turn: capped_turn,
+                action: PlayerAction::Wait,
+            },
+        ];
+        let transition = resolve_turn(&capped_state, &capped_requests, &catalog).unwrap();
+        assert_eq!(
+            transition.next_snapshot.participants[0].team[0].energy, MAX_ENERGY,
+            "a fast move at full energy cannot bank overflow"
+        );
     }
 
     #[test]

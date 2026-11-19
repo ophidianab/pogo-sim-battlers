@@ -111,6 +111,7 @@ Implement the first milestone: a deterministic 1v1 battle engine that uses immut
   - [x] Add a Rust integration test that loads committed fixtures, runs their action inputs, and compares the complete normalized result.
   - [x] Report fixture ID and first differing JSON path on comparison failure.
   - [x] Add matched single-active Surf fixtures for charged moves with and without shields; verify both against Rust results.
+  - [ ] Add a single-active PvPoke fixture for the 100-energy cap (start at 100, fast-move, spend) to confirm overflow is discarded identically.
   - [ ] Add single-active fixtures for type effectiveness and deterministic charged effects.
   - [x] Document the charged-lock `tap interaction wait` normalization delta in [BLUEPRINT.md](BLUEPRINT.md#127-pvpoke-compatibility-fixture-contract).
   - [ ] Extend the reference adapter for multi-Pokémon teams, swaps, and faint/replacement scenarios, or record the precise PvPoke simulation-mode limitation and corresponding compatibility delta.

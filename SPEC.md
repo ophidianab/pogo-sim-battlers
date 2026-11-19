@@ -168,7 +168,7 @@ When a charged move is being applied to a target:
 
 After all charged and fast move actions are queued:
 - Apply all queued fast move damage
-- Apply all energy gains (energy gained in turn N is available starting turn N+1, not usable in the same turn)
+- Apply all energy gains (energy gained in turn N is available starting turn N+1, not usable in the same turn); energy is capped at 100, and any fast-move gain beyond the cap is discarded
 - Reset fast-move cooldowns for completed moves
 - Detect faints from queued damage
 - Process forced swaps: auto-select the sole living bench Pokémon, or persist a pending choice when multiple living bench Pokémon remain

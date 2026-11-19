@@ -716,6 +716,7 @@ The following design decisions have been accepted and are now part of the implem
 - A charged move is queued at turn start and begins at the start of the next turn.
 - Damage resolves at the end of the turn.
 - Energy gained during a turn is not spendable until the following turn.
+- Energy is capped at 100. A fast move's gain is clamped at the cap and the overflow is discarded, matching PvPoke; `startingEnergy` is clamped the same way during setup.
 - A charged move that would otherwise kill the target still resolves if it is valid and queued under the turn-order rules.
 
 ### 12.3 Shield and mitigation rules

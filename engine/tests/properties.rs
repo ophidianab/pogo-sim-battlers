@@ -20,8 +20,9 @@ use engine::replay::{BATTLE_REPLAY_SCHEMA_VERSION, BattleReplay, ReplayRecorder}
 
 const CATALOG_REVISION: &str = "embedded-proptest";
 const TURN_DURATION_MS: u64 = 500;
-/// `initialize_battle` clamps `startingEnergy` to this value.
-const MAX_STARTING_ENERGY: u32 = 100;
+/// A battle cannot bank energy past 100; `startingEnergy` is clamped to the
+/// same value during setup.
+const MAX_ENERGY: u32 = 100;
 /// A hard bound for the finishing test; a battle that cannot decide in this
 /// many turns is a bug, not a slow fixture.
 const MAX_TURNS: usize = 1_000;
@@ -139,10 +140,10 @@ fn battle_plan() -> impl Strategy<Value = BattlePlan> {
         ),
         (0u8..=2, 0u8..=2),
         (
-            0u32..=MAX_STARTING_ENERGY,
-            0u32..=MAX_STARTING_ENERGY,
-            0u32..=MAX_STARTING_ENERGY,
-            0u32..=MAX_STARTING_ENERGY,
+            0u32..=MAX_ENERGY,
+            0u32..=MAX_ENERGY,
+            0u32..=MAX_ENERGY,
+            0u32..=MAX_ENERGY,
         ),
         prop::collection::vec(planned_turn(), 0..=24),
     )
@@ -269,6 +270,8 @@ fn run_plan(plan: &BattlePlan, catalog: &DataCatalog) -> BattleRun {
     let mut snapshots = vec![runner.snapshot().clone()];
     let mut error = None;
 
+    assert_initial_invariants(runner.snapshot(), plan);
+
     for planned in &plan.turns {
         if runner.is_finished() {
             break;
@@ -297,6 +300,26 @@ fn run_plan(plan: &BattlePlan, catalog: &DataCatalog) -> BattleRun {
         snapshots,
         error,
         replay: recorder.finish(),
+    }
+}
+
+fn assert_initial_invariants(snapshot: &BattleSnapshot, plan: &BattlePlan) {
+    assert_eq!(snapshot.turn(), 0);
+    assert!(snapshot.timeline().is_empty());
+    assert_eq!(snapshot.participants().len(), 2);
+
+    for (participant_index, participant) in snapshot.participants().iter().enumerate() {
+        assert_eq!(
+            participant.shields_remaining,
+            plan.shields[participant_index]
+        );
+        for pokemon in &participant.team {
+            assert!(
+                pokemon.energy <= MAX_ENERGY,
+                "starting energy must be clamped to the cap"
+            );
+            assert!(pokemon.current_hp <= pokemon.max_hp);
+        }
     }
 }
 
@@ -383,8 +406,11 @@ fn assert_transition_invariants(
                 after_pokemon.current_hp == 0,
                 "the fainted flag must match zero HP"
             );
-            // The engine clamps only `startingEnergy`; accumulated energy is not
-            // capped at 100, so the invariant is the per-turn gain bound.
+            // PvPoke caps energy at 100; gains also never exceed one fast move.
+            assert!(
+                after_pokemon.energy <= MAX_ENERGY,
+                "energy must never exceed the 100-point cap"
+            );
             assert!(
                 after_pokemon.energy <= before_pokemon.energy + max_gain,
                 "energy may only grow by the completed fast-move gain"

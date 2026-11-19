@@ -11,7 +11,8 @@ use crate::model::{
 };
 use crate::observations::{ObservationError, build_observation};
 use crate::transition::{
-    TURN_DURATION_MS, TransitionError, TurnTransition, resolve_turn_with_shield_decisions,
+    MAX_ENERGY, TURN_DURATION_MS, TransitionError, TurnTransition,
+    resolve_turn_with_shield_decisions,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -399,7 +400,7 @@ pub fn initialize_battle(
                     defense: initialized.combat_stats.defense,
                 },
                 stat_stages: StatStages::default(),
-                energy: pokemon_setup.starting_energy.min(100),
+                energy: pokemon_setup.starting_energy.min(MAX_ENERGY),
                 pending_energy_gain: 0,
                 cooldowns: Cooldowns {
                     fast_move_ms: 0,
