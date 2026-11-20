@@ -4,7 +4,7 @@ import path from "node:path";
 import vm from "node:vm";
 
 const FIXTURE_VERSION = 1;
-const GENERATOR_REVISION = "pvpoke-node-harness-v1";
+const GENERATOR_REVISION = "pvpoke-node-harness-v2";
 const TURN_DURATION_MS = 500;
 const [fixturePath, outputPath = fixturePath] = process.argv.slice(2);
 
@@ -130,12 +130,6 @@ for (const [participantIndex, participant] of setup.participants.entries()) {
       pokemon.selectMove("charged", "STRUGGLE", 0, true);
     }
     pokemon.setShields(participant.shieldsRemaining);
-    if (pokemonSetup.startingHp !== undefined) {
-      pokemon.setStartHp(pokemonSetup.startingHp);
-    }
-    if (pokemonSetup.startingEnergy !== undefined) {
-      pokemon.setStartEnergy(pokemonSetup.startingEnergy);
-    }
     return pokemon;
   });
   player.setTeam(team);
@@ -146,6 +140,15 @@ for (const [participantIndex, participant] of setup.participants.entries()) {
 battle.setPlayers(players);
 for (const [participantIndex, pokemon] of activePokemon.entries()) {
   battle.setNewPokemon(pokemon, participantIndex);
+
+  // Set these after initialization: setNewPokemon resets both start values.
+  const pokemonSetup = setup.participants[participantIndex].team[0];
+  if (pokemonSetup.startingHp !== undefined) {
+    pokemon.setStartHp(pokemonSetup.startingHp);
+  }
+  if (pokemonSetup.startingEnergy !== undefined) {
+    pokemon.setStartEnergy(pokemonSetup.startingEnergy);
+  }
 }
 battle.setSandboxMode(true);
 
