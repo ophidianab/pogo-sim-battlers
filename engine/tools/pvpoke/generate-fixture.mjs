@@ -4,7 +4,7 @@ import path from "node:path";
 import vm from "node:vm";
 
 const FIXTURE_VERSION = 1;
-const GENERATOR_REVISION = "pvpoke-node-harness-v3";
+const GENERATOR_REVISION = "pvpoke-node-harness-v4";
 const TURN_DURATION_MS = 500;
 const [fixturePath, outputPath = fixturePath] = process.argv.slice(2);
 
@@ -177,6 +177,9 @@ const expandedSteps = fixture.input.steps.flatMap((template) => {
 // forced-switch continuation steps can share a turn.
 let expectedTurn = 0;
 for (const step of expandedSteps) {
+  if (!Array.isArray(step.actionRequests)) {
+    fail("each input.steps item must contain actionRequests");
+  }
   const requestTurns = new Set(step.actionRequests.map((request) => request.turn));
   if (requestTurns.size !== 1) {
     fail("all action requests in a step must have the same turn");
@@ -198,13 +201,24 @@ for (const step of expandedSteps) {
 
 for (const step of expandedSteps) {
   for (const decision of step.shieldDecisions ?? []) {
-    shieldDecisionsByParticipantTurn.set(
-      `${decision.participantId}:${decision.turn}`,
-      decision,
-    );
+    if (!participantsById.has(decision.participantId)) {
+      fail(`unknown shield decision participantId ${decision.participantId}`);
+    }
+    if (!Number.isInteger(decision.turn) || decision.turn < 0) {
+      fail(`shield decision turn ${decision.turn} must be a non-negative integer`);
+    }
+    if (decision.decision !== "shield" && decision.decision !== "no_shield") {
+      fail('shield decision must be "shield" or "no_shield"');
+    }
+    const key = `${decision.participantId}:${decision.turn}`;
+    if (shieldDecisionsByParticipantTurn.has(key)) {
+      fail(`duplicate shield decision for ${decision.participantId} on turn ${decision.turn}`);
+    }
+    shieldDecisionsByParticipantTurn.set(key, decision);
   }
 }
-for (const step of fixture.input.steps) {
+const expectedShieldDecisionKeys = new Set();
+for (const step of expandedSteps) {
   if (!Array.isArray(step.actionRequests)) {
     fail("each input.steps item must contain actionRequests");
   }
@@ -282,7 +296,9 @@ for (const step of fixture.input.steps) {
 
     if (actionType === "chargedMove") {
       const targetId = setup.participants[targetParticipantIndex].participantId;
-      const shieldDecision = shieldDecisionsByParticipantTurn.get(`${targetId}:${requestTurn + 1}`);
+      const shieldDecisionKey = `${targetId}:${requestTurn + 1}`;
+      expectedShieldDecisionKeys.add(shieldDecisionKey);
+      const shieldDecision = shieldDecisionsByParticipantTurn.get(shieldDecisionKey);
       var shielded = shieldDecision?.decision === "shield";
     } else {
       var shielded = false;
@@ -300,6 +316,14 @@ for (const step of fixture.input.steps) {
         priority: activePokemon[participantIndex].priority,
       },
     ));
+  }
+}
+
+for (const [key, decision] of shieldDecisionsByParticipantTurn) {
+  if (!expectedShieldDecisionKeys.has(key)) {
+    fail(
+      `shield decision for ${decision.participantId} on turn ${decision.turn} has no incoming charged move`,
+    );
   }
 }
 
