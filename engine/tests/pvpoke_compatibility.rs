@@ -1,4 +1,6 @@
+use std::any::Any;
 use std::fs;
+use std::panic::{self, AssertUnwindSafe};
 use std::path::Path;
 
 use serde_json::Value;
@@ -25,36 +27,99 @@ fn committed_pvpoke_fixtures_match_battle_results() {
     );
 
     let catalog = DataCatalog::embedded().unwrap();
-    for fixture_path in fixture_paths {
-        let fixture: Value = serde_json::from_slice(&fs::read(&fixture_path).unwrap()).unwrap();
-        assert_eq!(fixture["fixtureVersion"], 1, "{}", fixture_path.display());
-        let case_id = fixture["caseId"].as_str().unwrap();
-        let setup = parse_setup(&fixture["input"]["battleSetup"]);
-        let mut runner = BattleRunner::new(&setup, &catalog).unwrap();
+    let mut report = String::new();
+    let mut failure_count = 0;
+    for fixture_path in &fixture_paths {
+        let label = fixture_path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .unwrap_or("<unknown>");
 
-        for step in expand_steps(&fixture["input"]["steps"]) {
-            let requests: Vec<ActionRequest> =
-                serde_json::from_value(step["actionRequests"].clone()).unwrap();
-            let shield_decisions: Vec<ShieldDecisionRequest> =
-                serde_json::from_value(step["shieldDecisions"].clone()).unwrap();
-            runner
-                .advance_turn_with_shield_decisions(&requests, &shield_decisions)
-                .unwrap_or_else(|error| panic!("fixture {case_id}: {error}"));
-            if runner.is_finished() {
-                break;
+        let outcome = panic::catch_unwind(AssertUnwindSafe(|| run_fixture(fixture_path, &catalog)));
+        match outcome {
+            Ok(Ok(case_id)) => {
+                println!("PASS {case_id}");
+                report.push_str(&format!("PASS {case_id}\n"));
+            }
+            Ok(Err(failure)) => {
+                failure_count += 1;
+                eprintln!("FAIL {failure}");
+                report.push_str(&format!("FAIL {failure}\n"));
+            }
+            Err(payload) => {
+                failure_count += 1;
+                let failure = format!("{label}: {}", panic_message(payload));
+                eprintln!("FAIL {failure}");
+                report.push_str(&format!("FAIL {failure}\n"));
             }
         }
+    }
 
-        assert!(
-            runner.is_finished(),
-            "fixture {case_id}: action stream did not finish the battle"
-        );
-        let actual = serde_json::to_value(runner.result().unwrap()).unwrap();
-        let expected = &fixture["expectedResult"];
-        if let Some(difference) = first_difference(expected, &actual, "$".to_owned()) {
-            panic!("fixture {case_id} differs at {difference}");
+    assert_eq!(
+        failure_count,
+        0,
+        "{failure_count} of {} PvPoke fixture(s) failed:\n{report}",
+        fixture_paths.len()
+    );
+}
+
+fn run_fixture(fixture_path: &Path, catalog: &DataCatalog) -> Result<String, String> {
+    let fixture: Value = serde_json::from_slice(
+        &fs::read(fixture_path).map_err(|error| format!("{}: {error}", fixture_path.display()))?,
+    )
+    .map_err(|error| format!("{}: {error}", fixture_path.display()))?;
+
+    let case_id = fixture["caseId"]
+        .as_str()
+        .ok_or_else(|| format!("{}: missing caseId", fixture_path.display()))?;
+    if fixture["fixtureVersion"] != 1 {
+        return Err(format!(
+            "{case_id}: unsupported fixtureVersion {}",
+            fixture["fixtureVersion"]
+        ));
+    }
+
+    let setup = parse_setup(&fixture["input"]["battleSetup"]);
+    let mut runner =
+        BattleRunner::new(&setup, catalog).map_err(|error| format!("{case_id}: {error}"))?;
+
+    for step in expand_steps(&fixture["input"]["steps"]) {
+        let requests: Vec<ActionRequest> = serde_json::from_value(step["actionRequests"].clone())
+            .map_err(|error| format!("{case_id}: {error}"))?;
+        let shield_decisions: Vec<ShieldDecisionRequest> =
+            serde_json::from_value(step["shieldDecisions"].clone())
+                .map_err(|error| format!("{case_id}: {error}"))?;
+        runner
+            .advance_turn_with_shield_decisions(&requests, &shield_decisions)
+            .map_err(|error| format!("{case_id}: {error}"))?;
+        if runner.is_finished() {
+            break;
         }
     }
+
+    if !runner.is_finished() {
+        return Err(format!(
+            "{case_id}: action stream did not finish the battle"
+        ));
+    }
+
+    let actual = serde_json::to_value(runner.result().unwrap()).unwrap();
+    let expected = &fixture["expectedResult"];
+    if let Some(difference) = first_difference(expected, &actual, "$".to_owned()) {
+        return Err(format!("{case_id} differs at {difference}"));
+    }
+
+    Ok(case_id.to_owned())
+}
+
+fn panic_message(payload: Box<dyn Any + Send>) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        return (*message).to_owned();
+    }
+    if let Some(message) = payload.downcast_ref::<String>() {
+        return message.clone();
+    }
+    "fixture panicked with a non-string payload".to_owned()
 }
 
 fn parse_setup(value: &Value) -> BattleSetup {

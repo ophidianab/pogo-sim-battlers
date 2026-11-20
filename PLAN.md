@@ -110,6 +110,8 @@ Implement the first milestone: a deterministic 1v1 battle engine that uses immut
   - [x] Capture and commit a deterministic neutral fast-move fixture for Pidgey versus Rattata using Tackle.
   - [x] Add a Rust integration test that loads committed fixtures, runs their action inputs, and compares the complete normalized result.
   - [x] Report fixture ID and first differing JSON path on comparison failure.
+  - [x] Aggregate PvPoke fixture failures: run every committed fixture, report each fixture's pass/fail status and the first differing JSON path for every failing fixture, and fail once at the end instead of aborting on the first mismatch.
+  - [ ] Report each committed PvPoke fixture as an individual test case (for example with `libtest-mimic` or `datatest-stable`) so fixture names appear in normal test output and can be filtered directly.
   - [x] Add matched single-active Surf fixtures for charged moves with and without shields; verify both against Rust results.
   - [x] Add a single-active PvPoke fixture for the 100-energy cap (`energy-cap-overflow-discarded`): starts at 100, overflows with a fast move, spends Surf, then attempts Thunder one turn before it is affordable when overflow is discarded; the charged-move resolves a turn later than it would if overflow were banked, making the cap behaviorally observable.
   - [ ] Fix the PvPoke fixture harness so `startingHp` is honored: `generate-fixture.mjs` currently calls `setStartHp` before `battle.setNewPokemon`, whose initialization resets it to full HP. Apply the override after battle initialization (alongside `startingEnergy`) and bump `generatorRevision`/regenerate fixtures if the harness behavior changes.
