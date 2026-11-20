@@ -172,6 +172,30 @@ const expandedSteps = fixture.input.steps.flatMap((template) => {
   }));
 });
 
+// The reference adapter currently supports one active Pokémon per participant, so
+// each expanded step must advance exactly one turn. Revisit this guard when
+// forced-switch continuation steps can share a turn.
+let expectedTurn = 0;
+for (const step of expandedSteps) {
+  const requestTurns = new Set(step.actionRequests.map((request) => request.turn));
+  if (requestTurns.size !== 1) {
+    fail("all action requests in a step must have the same turn");
+  }
+  const turn = step.actionRequests[0]?.turn;
+  if (!Number.isInteger(turn) || turn < 0) {
+    fail(`step turn ${turn} must be a non-negative integer`);
+  }
+  if (turn < expectedTurn) {
+    fail(
+      `step turn ${turn} overlaps an earlier step; repeatCount ranges must not overlap other steps`,
+    );
+  }
+  if (turn > expectedTurn) {
+    fail(`missing action step for turn ${expectedTurn}; steps must cover consecutive turns`);
+  }
+  expectedTurn += 1;
+}
+
 for (const step of expandedSteps) {
   for (const decision of step.shieldDecisions ?? []) {
     shieldDecisionsByParticipantTurn.set(

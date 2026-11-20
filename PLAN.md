@@ -118,8 +118,9 @@ Implement the first milestone: a deterministic 1v1 battle engine that uses immut
   - [x] Add a single-active fixture for type effectiveness (`fast-type-effectiveness-water-gun-charmander`): Water Gun into Charmander is super effective while Scratch into Lanturn is neutral.
   - [x] Add a single-active fixture for deterministic charged effects (`charged-icy-wind-guaranteed-debuff`): Seel's guaranteed Icy Wind debuff reduces Sharpedo's Bite damage from 7 to 5 and records `buffApplied`.
   - [x] Make fixture regeneration independent of previously trimmed `repeatCount` values: stop rewriting `input.steps` after simulation, and fail generation when the action stream does not cover the battle or leaves both sides alive. Regenerating the same fixture twice is now byte-identical. Bumped the generator revision to `pvpoke-node-harness-v3`.
+  - [x] Reject overlapping or gapped fixture steps during generation: expanded steps must occupy consecutive turns, so an oversized `repeatCount` can no longer duplicate later explicit steps.
   - [x] Document the charged-lock `tap interaction wait` normalization delta in [BLUEPRINT.md](BLUEPRINT.md#127-pvpoke-compatibility-fixture-contract).
-  - [ ] Extend the reference adapter for multi-Pokémon teams, swaps, and faint/replacement scenarios, or record the precise PvPoke simulation-mode limitation and corresponding compatibility delta.
+  - [ ] Extend the reference adapter for multi-Pokémon teams, swaps, and faint/replacement scenarios, or record the precise PvPoke simulation-mode limitation and corresponding compatibility delta. This also requires relaxing the consecutive-turn step guard to allow forced-switch continuation steps that share a turn.
   - [ ] Add chance-based or equal-CMP fixtures only when the reference RNG algorithm and draw ordering can reproduce their outcomes; otherwise retain targeted seeded engine tests without claiming PvPoke parity.
   - [ ] Document each intentional compatibility delta and require an explanation and provenance update when golden outputs change.
 
