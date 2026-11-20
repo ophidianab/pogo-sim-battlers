@@ -4,7 +4,7 @@ import path from "node:path";
 import vm from "node:vm";
 
 const FIXTURE_VERSION = 1;
-const GENERATOR_REVISION = "pvpoke-node-harness-v2";
+const GENERATOR_REVISION = "pvpoke-node-harness-v3";
 const TURN_DURATION_MS = 500;
 const [fixturePath, outputPath = fixturePath] = process.argv.slice(2);
 
@@ -421,11 +421,25 @@ for (const event of rawTimeline) {
 
 const pvpokeRatings = battle.getBattleRatings();
 const turns = timeline.length;
+let lastActionTurn = -1;
+for (const step of expandedSteps) {
+  for (const request of step.actionRequests) {
+    lastActionTurn = Math.max(lastActionTurn, request.turn);
+  }
+}
+if (lastActionTurn < turns - 1) {
+  fail(
+    `action stream covers through turn ${lastActionTurn} but battle lasted ${turns} turns; add steps or increase repeatCount`,
+  );
+}
 const finalPokemon = battle.getPokemon();
 const teamTotals = finalPokemon.map((pokemon) => ({
   maxHp: pokemon.stats.hp,
   finalHp: pokemon.hp,
 }));
+if (teamTotals.every(({ finalHp }) => finalHp > 0)) {
+  fail("action stream did not finish the battle; add steps or increase repeatCount");
+}
 const participants = setup.participants.map((participant, index) => {
   const opponent = teamTotals[1 - index];
   const opponentDamage = opponent.maxHp - opponent.finalHp;
@@ -466,20 +480,6 @@ fixture.expectedResult = {
   totalTurns: turns,
   battleDuration: turns * TURN_DURATION_MS,
 };
-
-fixture.input.steps = fixture.input.steps.flatMap((template) => {
-  const baseTurn = template.actionRequests[0]?.turn;
-  const repeatCount = template.repeatCount ?? 1;
-  if (baseTurn === undefined || baseTurn >= turns) {
-    return [];
-  }
-  const usedRepeatCount = Math.min(repeatCount, turns - baseTurn);
-  return [{
-    ...template,
-    ...(usedRepeatCount > 1 ? { repeatCount: usedRepeatCount } : {}),
-    ...(usedRepeatCount === 1 ? { repeatCount: undefined } : {}),
-  }];
-});
 
 const output = `${JSON.stringify(fixture, null, 2)}\n`;
 const temporaryPath = `${outputPath}.tmp`;

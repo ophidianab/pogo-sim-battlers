@@ -5,7 +5,7 @@
     "repository": "git@github.com:pvpoke/pvpoke.git",
     "commit": "3ca651c7c83f3d39704f33b28ac4ca01ae10bf16",
     "gamemasterBlob": "f18467bc4ef139e47f357e05335ca0578c4c3857",
-    "generatorRevision": "pvpoke-node-harness-v2"
+    "generatorRevision": "pvpoke-node-harness-v3"
   },
   "input": {
     "battleSetup": {
@@ -65,7 +65,7 @@
     },
     "steps": [
       {
-        "repeatCount": 13,
+        "repeatCount": 100,
         "actionRequests": [
           {
             "participantId": "left",
