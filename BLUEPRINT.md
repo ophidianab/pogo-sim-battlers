@@ -774,7 +774,7 @@ One known timeline normalization delta is the `tap interaction wait` marker PvPo
 
 Each committed fixture is self-contained with respect to battle inputs and expected output. It does not embed the PvPoke source or Game Master file; the provenance identifies the pinned external oracle. Normal Rust tests consume committed goldens offline. Regeneration requires the pinned PvPoke checkout and matching Game Master revision, and must be an explicit command so expected output changes can be reviewed.
 
-The initial fixture set starts with a deterministic neutral fast-move battle, then adds shielded and unshielded charged moves, type effectiveness, deterministic charged effects, multi-turn fast moves, swaps, and faint/replacement behavior. Chance-based or equal-CMP fixtures are included only if the reference RNG algorithm and draw ordering reproduce the same outcomes; otherwise those behaviors remain covered by seeded engine tests without asserting cross-engine RNG parity.
+The initial fixture set starts with a deterministic neutral fast-move battle, then adds shielded and unshielded charged moves, 100-energy cap overflow, type effectiveness, deterministic charged effects, multi-turn fast moves, swaps, and faint/replacement behavior. Chance-based or equal-CMP fixtures are included only if the reference RNG algorithm and draw ordering reproduce the same outcomes; otherwise those behaviors remain covered by seeded engine tests without asserting cross-engine RNG parity.
 
 ## 13. Remaining Open Design Questions
 

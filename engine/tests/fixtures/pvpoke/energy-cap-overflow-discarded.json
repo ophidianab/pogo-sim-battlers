@@ -1,0 +1,977 @@
+{
+  "fixtureVersion": 1,
+  "caseId": "energy-cap-overflow-discarded",
+  "reference": {
+    "repository": "git@github.com:pvpoke/pvpoke.git",
+    "commit": "3ca651c7c83f3d39704f33b28ac4ca01ae10bf16",
+    "gamemasterBlob": "f18467bc4ef139e47f357e05335ca0578c4c3857",
+    "generatorRevision": "pvpoke-node-harness-v1"
+  },
+  "input": {
+    "battleSetup": {
+      "battleId": "energy-cap-overflow-discarded",
+      "rngSeed": 7,
+      "cpLimit": 1500,
+      "participants": [
+        {
+          "participantId": "left",
+          "controllerType": "scripted",
+          "shieldsRemaining": 0,
+          "team": [
+            {
+              "pokemonId": "left-lanturn",
+              "build": {
+                "speciesId": "lanturn",
+                "level": 20,
+                "ivs": {
+                  "attack": 10,
+                  "defense": 10,
+                  "hp": 10
+                },
+                "shadow": false
+              },
+              "fastMove": "WATER_GUN",
+              "chargedMoves": [
+                "SURF",
+                "THUNDER"
+              ],
+              "startingEnergy": 100
+            }
+          ]
+        },
+        {
+          "participantId": "right",
+          "controllerType": "scripted",
+          "shieldsRemaining": 0,
+          "team": [
+            {
+              "pokemonId": "right-snorlax",
+              "build": {
+                "speciesId": "snorlax",
+                "level": 20,
+                "ivs": {
+                  "attack": 10,
+                  "defense": 10,
+                  "hp": 10
+                },
+                "shadow": false
+              },
+              "fastMove": "LICK",
+              "chargedMoves": [
+                "BODY_SLAM"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "steps": [
+      {
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 0,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "WATER_GUN"
+            }
+          },
+          {
+            "participantId": "right",
+            "turn": 0,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "LICK"
+            }
+          }
+        ],
+        "shieldDecisions": []
+      },
+      {
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 1,
+            "actionType": "chargedMove",
+            "payload": {
+              "moveId": "SURF"
+            }
+          },
+          {
+            "participantId": "right",
+            "turn": 1,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "LICK"
+            }
+          }
+        ],
+        "shieldDecisions": [
+          {
+            "participantId": "right",
+            "turn": 2,
+            "decision": "no_shield"
+          }
+        ]
+      },
+      {
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 2,
+            "actionType": "wait"
+          },
+          {
+            "participantId": "right",
+            "turn": 2,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "LICK"
+            }
+          }
+        ],
+        "shieldDecisions": []
+      },
+      {
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 3,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "WATER_GUN"
+            }
+          },
+          {
+            "participantId": "right",
+            "turn": 3,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "LICK"
+            }
+          }
+        ],
+        "shieldDecisions": []
+      },
+      {
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 4,
+            "actionType": "chargedMove",
+            "payload": {
+              "moveId": "THUNDER"
+            }
+          },
+          {
+            "participantId": "right",
+            "turn": 4,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "LICK"
+            }
+          }
+        ],
+        "shieldDecisions": [
+          {
+            "participantId": "right",
+            "turn": 5,
+            "decision": "no_shield"
+          }
+        ]
+      },
+      {
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 5,
+            "actionType": "chargedMove",
+            "payload": {
+              "moveId": "THUNDER"
+            }
+          },
+          {
+            "participantId": "right",
+            "turn": 5,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "LICK"
+            }
+          }
+        ],
+        "shieldDecisions": [
+          {
+            "participantId": "right",
+            "turn": 6,
+            "decision": "no_shield"
+          }
+        ]
+      },
+      {
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 6,
+            "actionType": "wait"
+          },
+          {
+            "participantId": "right",
+            "turn": 6,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "LICK"
+            }
+          }
+        ],
+        "shieldDecisions": []
+      },
+      {
+        "repeatCount": 25,
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 7,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "WATER_GUN"
+            }
+          },
+          {
+            "participantId": "right",
+            "turn": 7,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "LICK"
+            }
+          }
+        ],
+        "shieldDecisions": []
+      }
+    ]
+  },
+  "expectedResult": {
+    "battleId": "energy-cap-overflow-discarded",
+    "outcome": "participant_0_win",
+    "winner": "left",
+    "loser": "right",
+    "participants": [
+      {
+        "participantId": "left",
+        "side": "left",
+        "rating": 710,
+        "finalHp": 70,
+        "maxHp": 166,
+        "opponentDamage": 203,
+        "opponentMaxHp": 203
+      },
+      {
+        "participantId": "right",
+        "side": "right",
+        "rating": 289,
+        "finalHp": 0,
+        "maxHp": 203,
+        "opponentDamage": 96,
+        "opponentMaxHp": 166
+      }
+    ],
+    "timeline": [
+      {
+        "turn": 0,
+        "timestamp": 0,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 1,
+        "timestamp": 500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 2,
+        "timestamp": 1000,
+        "events": [
+          {
+            "kind": "charged",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "SURF",
+            "damage": 51,
+            "shielded": false,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 3,
+        "timestamp": 1500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 4,
+        "timestamp": 2000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 5,
+        "timestamp": 2500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 6,
+        "timestamp": 3000,
+        "events": [
+          {
+            "kind": "charged",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "THUNDER",
+            "damage": 68,
+            "shielded": false,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 7,
+        "timestamp": 3500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 8,
+        "timestamp": 4000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 9,
+        "timestamp": 4500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 10,
+        "timestamp": 5000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 11,
+        "timestamp": 5500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 12,
+        "timestamp": 6000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 13,
+        "timestamp": 6500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 14,
+        "timestamp": 7000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 15,
+        "timestamp": 7500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 16,
+        "timestamp": 8000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 17,
+        "timestamp": 8500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 18,
+        "timestamp": 9000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 19,
+        "timestamp": 9500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 20,
+        "timestamp": 10000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 21,
+        "timestamp": 10500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 22,
+        "timestamp": 11000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 23,
+        "timestamp": 11500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 24,
+        "timestamp": 12000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 25,
+        "timestamp": 12500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 26,
+        "timestamp": 13000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 27,
+        "timestamp": 13500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 28,
+        "timestamp": 14000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 29,
+        "timestamp": 14500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 30,
+        "timestamp": 15000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 31,
+        "timestamp": 15500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "LICK",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "faint",
+            "participantId": "right",
+            "species": "snorlax"
+          }
+        ]
+      }
+    ],
+    "totalTurns": 32,
+    "battleDuration": 16000
+  }
+}

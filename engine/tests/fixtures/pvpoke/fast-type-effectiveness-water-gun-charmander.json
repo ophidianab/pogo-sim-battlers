@@ -1,0 +1,412 @@
+{
+  "fixtureVersion": 1,
+  "caseId": "fast-type-effectiveness-water-gun-charmander",
+  "reference": {
+    "repository": "git@github.com:pvpoke/pvpoke.git",
+    "commit": "3ca651c7c83f3d39704f33b28ac4ca01ae10bf16",
+    "gamemasterBlob": "f18467bc4ef139e47f357e05335ca0578c4c3857",
+    "generatorRevision": "pvpoke-node-harness-v1"
+  },
+  "input": {
+    "battleSetup": {
+      "battleId": "fast-type-effectiveness-water-gun-charmander",
+      "rngSeed": 7,
+      "cpLimit": 1500,
+      "participants": [
+        {
+          "participantId": "left",
+          "controllerType": "scripted",
+          "shieldsRemaining": 0,
+          "team": [
+            {
+              "pokemonId": "left-lanturn",
+              "build": {
+                "speciesId": "lanturn",
+                "level": 20,
+                "ivs": {
+                  "attack": 10,
+                  "defense": 10,
+                  "hp": 10
+                },
+                "shadow": false
+              },
+              "fastMove": "WATER_GUN",
+              "chargedMoves": [
+                "SURF"
+              ]
+            }
+          ]
+        },
+        {
+          "participantId": "right",
+          "controllerType": "scripted",
+          "shieldsRemaining": 0,
+          "team": [
+            {
+              "pokemonId": "right-charmander",
+              "build": {
+                "speciesId": "charmander",
+                "level": 20,
+                "ivs": {
+                  "attack": 10,
+                  "defense": 10,
+                  "hp": 10
+                },
+                "shadow": false
+              },
+              "fastMove": "SCRATCH",
+              "chargedMoves": [
+                "FLAME_BURST"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "steps": [
+      {
+        "repeatCount": 13,
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 0,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "WATER_GUN"
+            }
+          },
+          {
+            "participantId": "right",
+            "turn": 0,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "SCRATCH"
+            }
+          }
+        ],
+        "shieldDecisions": []
+      }
+    ]
+  },
+  "expectedResult": {
+    "battleId": "fast-type-effectiveness-water-gun-charmander",
+    "outcome": "participant_0_win",
+    "winner": "left",
+    "loser": "right",
+    "participants": [
+      {
+        "participantId": "left",
+        "side": "left",
+        "rating": 882,
+        "finalHp": 127,
+        "maxHp": 166,
+        "opponentDamage": 76,
+        "opponentMaxHp": 76
+      },
+      {
+        "participantId": "right",
+        "side": "right",
+        "rating": 117,
+        "finalHp": 0,
+        "maxHp": 76,
+        "opponentDamage": 39,
+        "opponentMaxHp": 166
+      }
+    ],
+    "timeline": [
+      {
+        "turn": 0,
+        "timestamp": 0,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 6,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "SCRATCH",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 1,
+        "timestamp": 500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 6,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "SCRATCH",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 2,
+        "timestamp": 1000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 6,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "SCRATCH",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 3,
+        "timestamp": 1500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 6,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "SCRATCH",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 4,
+        "timestamp": 2000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 6,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "SCRATCH",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 5,
+        "timestamp": 2500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 6,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "SCRATCH",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 6,
+        "timestamp": 3000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 6,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "SCRATCH",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 7,
+        "timestamp": 3500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 6,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "SCRATCH",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 8,
+        "timestamp": 4000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 6,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "SCRATCH",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 9,
+        "timestamp": 4500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 6,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "SCRATCH",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 10,
+        "timestamp": 5000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 6,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "SCRATCH",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 11,
+        "timestamp": 5500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 6,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "SCRATCH",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 12,
+        "timestamp": 6000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "WATER_GUN",
+            "damage": 6,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "SCRATCH",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "faint",
+            "participantId": "right",
+            "species": "charmander"
+          }
+        ]
+      }
+    ],
+    "totalTurns": 13,
+    "battleDuration": 6500
+  }
+}
