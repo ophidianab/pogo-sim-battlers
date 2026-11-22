@@ -789,6 +789,18 @@ Each committed fixture is self-contained with respect to battle inputs and expec
 
 The initial fixture set starts with a deterministic neutral fast-move battle, then adds shielded and unshielded charged moves, 100-energy cap overflow, type effectiveness, deterministic charged effects, multi-turn fast moves, swaps, and faint/replacement behavior. Chance-based or equal-CMP fixtures are included only if the reference RNG algorithm and draw ordering reproduce the same outcomes; otherwise those behaviors remain covered by seeded engine tests without asserting cross-engine RNG parity.
 
+### RNG, chance-based effects, and equal-CMP ordering
+
+PvPoke calls the browser's unseeded `Math.random()` directly, while this engine consumes draws from a seeded `rng_state` carried in the snapshot. Because the harness cannot intercept or seed PvPoke's `Math.random()` without patching the reference runtime, cross-engine RNG parity cannot be asserted, and chance-based or equal-CMP outcomes are intentionally excluded from committed fixtures.
+
+The following behaviors differ between the two runtimes and are therefore not used as cross-engine oracles:
+
+- **Buff/chance application.** PvPoke rolls `Math.random()` against `buffApplyChance` (Battle.js), with a deterministic `buffApplyMeter` fallback in default sim mode. The engine rolls once from `rng_state` per charged-move resolution (transition.rs `roll_chance`). Draw counts and ordering differ, so a fixture that depends on a sub-1.0 effect chance would not reproduce identically. Guaranteed effects (`buffApplyChance == 1`) are covered by existing fixtures such as `charged-icy-wind-guaranteed-debuff`.
+- **Equal-CMP charged-move ordering.** When both participants have equal attack stats, PvPoke disables priority and relies on stable insertion-order tie-breaks in its action queue. The engine consumes one `rng_state` draw for a seeded 50/50 coin flip (transition.rs `equal_attack_priority`). Outcomes can diverge even when both sides act identically. Matchups with unequal attack stats avoid this entirely and remain the cross-engine baseline.
+- **Random player decisions.** PvPoke's `decisionMethod == "random"` uses weighted `Math.random()` choices for shields and actions; the engine's sandbox only accepts scripted decisions, so there is no equivalent reference behavior to compare against.
+
+These behaviors remain covered by seeded engine unit tests (`chance_based_charged_effects_are_reproducible_from_snapshot_rng_state`, `equal_attack_charged_moves_use_seeded_coin_flip_and_replay_deterministically`) rather than by PvPoke compatibility fixtures. If a future change seeds PvPoke's `Math.random()` inside the harness, this delta can be revisited and compatible fixtures added.
+
 ## 13. Remaining Open Design Questions
 
 The blueprint still leaves the following as explicit follow-up items for implementation detail work:

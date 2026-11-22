@@ -136,7 +136,7 @@ Implement the first milestone: a deterministic 1v1 battle engine that uses immut
     - [x] 11. Bump the generator revision to `pvpoke-node-harness-v5`, regenerate every fixture, confirm a second regeneration is byte-identical, and run `just compat` and `just check`. Existing one-active fixtures regenerate byte-for-byte apart from the revision.
     - [x] 12. Update the compatibility-delta documentation and `PLAN.md` status. Same-turn switch/damage ordering and simultaneous-faint ordering remain documented and are kept out of cross-engine fixtures; the engine retains targeted tests for those behaviors.
   - [ ] Add chance-based or equal-CMP fixtures only when the reference RNG algorithm and draw ordering can reproduce their outcomes; otherwise retain targeted seeded engine tests without claiming PvPoke parity.
-  - [ ] Document each intentional compatibility delta and require an explanation and provenance update when golden outputs change.
+  - [x] Document each intentional compatibility delta and require an explanation and provenance update when golden outputs change.
 
 ### Acceptance criteria
 - The 1v1 baseline passes the accepted compatibility tests.
