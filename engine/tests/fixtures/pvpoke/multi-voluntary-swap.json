@@ -1,0 +1,1031 @@
+{
+  "fixtureVersion": 1,
+  "caseId": "multi-voluntary-swap",
+  "reference": {
+    "repository": "git@github.com:pvpoke/pvpoke.git",
+    "commit": "3ca651c7c83f3d39704f33b28ac4ca01ae10bf16",
+    "gamemasterBlob": "f18467bc4ef139e47f357e05335ca0578c4c3857",
+    "generatorRevision": "pvpoke-node-harness-v5"
+  },
+  "input": {
+    "battleSetup": {
+      "battleId": "multi-voluntary-swap",
+      "rngSeed": 7,
+      "cpLimit": 1500,
+      "participants": [
+        {
+          "participantId": "left",
+          "controllerType": "scripted",
+          "shieldsRemaining": 0,
+          "team": [
+            {
+              "pokemonId": "left-pidgey",
+              "build": {
+                "speciesId": "pidgey",
+                "level": 25,
+                "ivs": {
+                  "attack": 10,
+                  "defense": 10,
+                  "hp": 10
+                },
+                "shadow": false
+              },
+              "fastMove": "TACKLE",
+              "chargedMoves": [
+                "AERIAL_ACE"
+              ]
+            },
+            {
+              "pokemonId": "left-rattata",
+              "build": {
+                "speciesId": "rattata",
+                "level": 25,
+                "ivs": {
+                  "attack": 10,
+                  "defense": 10,
+                  "hp": 10
+                },
+                "shadow": false
+              },
+              "fastMove": "TACKLE",
+              "chargedMoves": [
+                "BODY_SLAM"
+              ]
+            }
+          ]
+        },
+        {
+          "participantId": "right",
+          "controllerType": "scripted",
+          "shieldsRemaining": 0,
+          "team": [
+            {
+              "pokemonId": "right-rattata",
+              "build": {
+                "speciesId": "rattata",
+                "level": 20,
+                "ivs": {
+                  "attack": 10,
+                  "defense": 10,
+                  "hp": 10
+                },
+                "shadow": false
+              },
+              "fastMove": "TACKLE",
+              "chargedMoves": [
+                "BODY_SLAM"
+              ]
+            },
+            {
+              "pokemonId": "right-pidgey-2",
+              "build": {
+                "speciesId": "pidgey",
+                "level": 20,
+                "ivs": {
+                  "attack": 10,
+                  "defense": 10,
+                  "hp": 10
+                },
+                "shadow": false
+              },
+              "fastMove": "TACKLE",
+              "chargedMoves": [
+                "AERIAL_ACE"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "steps": [
+      {
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 0,
+            "actionType": "swap",
+            "payload": {
+              "targetSlot": 1
+            }
+          },
+          {
+            "participantId": "right",
+            "turn": 0,
+            "actionType": "swap",
+            "payload": {
+              "targetSlot": 1
+            }
+          }
+        ],
+        "shieldDecisions": []
+      },
+      {
+        "repeatCount": 100,
+        "actionRequests": [
+          {
+            "participantId": "left",
+            "turn": 1,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "TACKLE"
+            }
+          },
+          {
+            "participantId": "right",
+            "turn": 1,
+            "actionType": "fastMove",
+            "payload": {
+              "moveId": "TACKLE"
+            }
+          }
+        ],
+        "shieldDecisions": []
+      }
+    ]
+  },
+  "expectedResult": {
+    "battleId": "multi-voluntary-swap",
+    "outcome": "participant_0_win",
+    "winner": "left",
+    "loser": "right",
+    "participants": [
+      {
+        "participantId": "left",
+        "side": "left",
+        "rating": 656,
+        "finalHp": 50,
+        "maxHp": 160,
+        "opponentDamage": 143,
+        "opponentMaxHp": 143
+      },
+      {
+        "participantId": "right",
+        "side": "right",
+        "rating": 343,
+        "finalHp": 0,
+        "maxHp": 143,
+        "opponentDamage": 110,
+        "opponentMaxHp": 160
+      }
+    ],
+    "timeline": [
+      {
+        "turn": 0,
+        "timestamp": 0,
+        "events": [
+          {
+            "kind": "swap",
+            "participantId": "left",
+            "species": "rattata"
+          },
+          {
+            "kind": "swap",
+            "participantId": "right",
+            "species": "pidgey"
+          }
+        ]
+      },
+      {
+        "turn": 1,
+        "timestamp": 500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 2,
+        "timestamp": 1000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 3,
+        "timestamp": 1500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 4,
+        "timestamp": 2000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 5,
+        "timestamp": 2500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 6,
+        "timestamp": 3000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 7,
+        "timestamp": 3500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 8,
+        "timestamp": 4000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 9,
+        "timestamp": 4500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 10,
+        "timestamp": 5000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 11,
+        "timestamp": 5500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 12,
+        "timestamp": 6000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 13,
+        "timestamp": 6500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 14,
+        "timestamp": 7000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 15,
+        "timestamp": 7500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 16,
+        "timestamp": 8000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 17,
+        "timestamp": 8500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 18,
+        "timestamp": 9000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 19,
+        "timestamp": 9500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 20,
+        "timestamp": 10000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "faint",
+            "participantId": "right",
+            "species": "pidgey"
+          },
+          {
+            "kind": "swap",
+            "participantId": "right",
+            "species": "rattata"
+          }
+        ]
+      },
+      {
+        "turn": 21,
+        "timestamp": 10500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 22,
+        "timestamp": 11000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 23,
+        "timestamp": 11500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 24,
+        "timestamp": 12000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 25,
+        "timestamp": 12500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "faint",
+            "participantId": "left",
+            "species": "rattata"
+          },
+          {
+            "kind": "swap",
+            "participantId": "left",
+            "species": "pidgey"
+          }
+        ]
+      },
+      {
+        "turn": 26,
+        "timestamp": 13000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 27,
+        "timestamp": 13500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 28,
+        "timestamp": 14000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 29,
+        "timestamp": 14500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 30,
+        "timestamp": 15000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 31,
+        "timestamp": 15500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 32,
+        "timestamp": 16000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 33,
+        "timestamp": 16500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 34,
+        "timestamp": 17000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 35,
+        "timestamp": 17500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 36,
+        "timestamp": 18000,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          }
+        ]
+      },
+      {
+        "turn": 37,
+        "timestamp": 18500,
+        "events": [
+          {
+            "kind": "tap_interaction",
+            "participantId": "left",
+            "targetParticipantId": "right",
+            "moveId": "TACKLE",
+            "damage": 4,
+            "durationMs": 500
+          },
+          {
+            "kind": "tap_interaction",
+            "participantId": "right",
+            "targetParticipantId": "left",
+            "moveId": "TACKLE",
+            "damage": 3,
+            "durationMs": 500
+          },
+          {
+            "kind": "faint",
+            "participantId": "right",
+            "species": "rattata"
+          }
+        ]
+      }
+    ],
+    "totalTurns": 38,
+    "battleDuration": 19000
+  }
+}

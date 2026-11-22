@@ -84,20 +84,78 @@ fn run_fixture(fixture_path: &Path, catalog: &DataCatalog) -> Result<String, Str
         BattleRunner::new(&setup, catalog).map_err(|error| format!("{case_id}: {error}"))?;
 
     for step in expand_steps(&fixture["input"]["steps"]) {
+        let step_kind = step["stepKind"].as_str().unwrap_or("turn");
+        let step_turn = step["actionRequests"][0]["turn"]
+            .as_u64()
+            .unwrap_or_default();
         let requests: Vec<ActionRequest> = serde_json::from_value(step["actionRequests"].clone())
             .map_err(|error| format!("{case_id}: {error}"))?;
         let shield_decisions: Vec<ShieldDecisionRequest> =
             serde_json::from_value(step["shieldDecisions"].clone())
                 .map_err(|error| format!("{case_id}: {error}"))?;
+
+        let pending = runner.snapshot().pending_forced_swaps();
+        match step_kind {
+            "forcedSwitch" => {
+                if pending.is_empty() {
+                    return Err(format!(
+                        "{case_id}: forcedSwitch step for turn {step_turn} has no pending replacement choice"
+                    ));
+                }
+            }
+            "turn" => {
+                if !pending.is_empty() {
+                    let participants = pending
+                        .iter()
+                        .map(|pending| pending.participant_id.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    return Err(format!(
+                        "{case_id}: turn {step_turn} must be a forcedSwitch continuation; pending replacement choice for {participants}"
+                    ));
+                }
+            }
+            other => {
+                return Err(format!(
+                    "{case_id}: unsupported stepKind {other} on turn {step_turn}"
+                ));
+            }
+        }
+
+        let turn_before = runner.snapshot().turn();
         runner
             .advance_turn_with_shield_decisions(&requests, &shield_decisions)
             .map_err(|error| format!("{case_id}: {error}"))?;
+        let turn_after = runner.snapshot().turn();
+
+        if step_kind == "forcedSwitch" {
+            if turn_after != turn_before {
+                return Err(format!(
+                    "{case_id}: forcedSwitch step for turn {step_turn} advanced the turn from {turn_before} to {turn_after}"
+                ));
+            }
+            if !runner.snapshot().pending_forced_swaps().is_empty() {
+                return Err(format!(
+                    "{case_id}: forcedSwitch step for turn {step_turn} did not resolve every pending replacement choice"
+                ));
+            }
+        } else if turn_after == turn_before {
+            return Err(format!(
+                "{case_id}: normal step for turn {step_turn} did not advance the turn"
+            ));
+        }
+
         if runner.is_finished() {
             break;
         }
     }
 
     if !runner.is_finished() {
+        if !runner.snapshot().pending_forced_swaps().is_empty() {
+            return Err(format!(
+                "{case_id}: action stream ended with an unresolved pending replacement choice"
+            ));
+        }
         return Err(format!(
             "{case_id}: action stream did not finish the battle"
         ));
