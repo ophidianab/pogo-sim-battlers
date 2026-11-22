@@ -41,3 +41,8 @@ fixture file:
     PVPOKE_DIR="${PVPOKE_DIR:-$HOME/code/pvpoke}" \
     CONTAINER_ENGINE="${CONTAINER_ENGINE:-podman}" \
     sh engine/tools/pvpoke/generate-fixture.sh {{quote(file)}}
+
+# Update the pinned PvPoke reference, provenance, embedded data, and fixtures.
+# Requires python3. Pass --dry-run to preview, or --ref <git-ref> to move the checkout first.
+update-pvpoke *args:
+    python3 engine/tools/pvpoke/update-reference.py {{args}}
